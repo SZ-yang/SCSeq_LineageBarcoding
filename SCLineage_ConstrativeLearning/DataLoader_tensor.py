@@ -97,7 +97,11 @@ class SClineage_DataLoader:
                         
                 
                 self.num_batch += 1
-                self.batch_all[self.num_batch] = single_batch
+                
+                # Convert the entire batch to a tensor before storing
+                # Assuming each element of single_batch is a tuple (tensor1, tensor2)
+                tensor_batch = [(torch.from_numpy(self.count_matrix[i]).float(), torch.from_numpy(self.count_matrix[j]).float()) for i, j in single_batch]
+                self.batch_all[self.num_batch] = tensor_batch
                 
                 
             else:
@@ -145,7 +149,28 @@ class SClineage_DataLoader:
 
 
                 self.num_batch += 1
-                self.batch_all[self.num_batch] = single_batch 
+                # Convert the entire batch to a tensor before storing
+                # Assuming each element of single_batch is a tuple (tensor1, tensor2)
+                tensor_batch = [(torch.from_numpy(self.count_matrix[i]).float(), torch.from_numpy(self.count_matrix[j]).float()) for i, j in single_batch]
+                self.batch_all[self.num_batch] = tensor_batch
+                
 
             
         return self.batch_all, self.num_batch 
+
+
+
+
+if __name__ == "__main__":
+    # Dummy data
+    n, p, M = 100, 5, 4  # 100 samples, 5 features, 4 groups
+    data = np.random.randn(n, p)  # Random data
+    lineages = np.random.randint(0, M, size=(n, 1))  # Random group labels
+
+    loader = SClineage_DataLoader(data, lineages, batch_size=10)
+    batches, num_batches = loader.batch_generator()
+
+    # Example: Accessing the first batch
+    first_batch = batches[1]
+    for pair in first_batch:
+        print(pair[0].shape, pair[1].shape)  # Each element of the pair is a tensor
