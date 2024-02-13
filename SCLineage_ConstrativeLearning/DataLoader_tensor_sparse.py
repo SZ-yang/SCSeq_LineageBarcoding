@@ -2,6 +2,7 @@
 import tempfile
 import os
 import scipy
+import scipy.sparse as sp
 import numpy as np
 import pandas as pd
 import copy
@@ -25,25 +26,34 @@ import torchvision.transforms as T
 
 '''
 left for improvements:
-1. Randomness Control for Reproductivity
-2. Efficiency
-3. Outputdata Type -> tensor
+1. Randomness Control for Reproductivity (done)
+2. Efficiency (done)
+3. Outputdata Type -> tensor (done)
+
 4. Documentation (actually batch size = self.batch_size*2)
 5. it won't handle if a lineage only has one cell
 
 '''
 
 class SClineage_DataLoader:
-    def __init__(self, count_matrix, lineages, batch_size = 10):
+    def __init__(self, count_matrix, lineages, batch_size = 10, seed=None):
         """
         Args:
-            count_matrix (numpy.ndarray): Data array of shape (n, p) with n samples and p features.
+            count_matrix (scipy.sparse.csr_matrix): Data array of shape (n, p) with n samples and p features.
             lineage (numpy.ndarray): Array of shape (n, 1) with group labels for each sample.
+            seed (int): Random seed for reproducibility.
         
         Vars:
             avail_lineage (dictionary): there's at least a cell in a lineage that has not yet assigned.
         """
-        self.count_matrix = count_matrix
+
+        self.seed = seed
+        if seed is not None:
+            random.seed(seed)  # Seed Python's built-in random module
+            np.random.seed(seed)  # Seed NumPy's random generator
+            torch.manual_seed(seed)  # Seed PyTorch's random generator
+        
+        self.count_matrix = count_matrix.toarray()
         self.lineages = lineages
         self.batch_size = batch_size
         self.batch_all = {}
@@ -163,12 +173,19 @@ class SClineage_DataLoader:
 
 if __name__ == "__main__":
     # Dummy data
-    n, p, M = 500, 5, 15  # 100 samples, 5 features, 4 groups
+    n, p, M = 500, 5, 15  # 500 samples, 5 features, 15 groups
     data = np.random.randn(n, p)  # Random data
+    data = sp.csr_matrix(data)
     lineages = np.random.randint(0, M, size=(n, 1))  # Random group labels
 
-    for i in range(15):
-        loader = SClineage_DataLoader(data, lineages, batch_size=10)
+    for i in range(10):
+        loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=10)
         batches, num_batches = loader.batch_generator()
-
+        
         print(num_batches, loader.avail_lineages)
+    for i in range(10):
+        loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=None)
+        batches, num_batches = loader.batch_generator()
+        
+        print(num_batches, loader.avail_lineages)
+

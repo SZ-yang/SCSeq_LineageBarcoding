@@ -13,12 +13,7 @@ import anndata as ad
 
 # deep learning package
 import torch
-import torchvision.models as models
-import torchvision.transforms as T
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision.datasets import STL10
-from torch.utils.data import DataLoader
+
 from torch.utils.data import Dataset
 from torch.multiprocessing import cpu_count
 import torchvision.transforms as T
