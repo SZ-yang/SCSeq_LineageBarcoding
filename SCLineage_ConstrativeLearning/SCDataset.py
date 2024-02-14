@@ -1,25 +1,7 @@
-# general package
-import tempfile
-import os
-import scipy
-import numpy as np
-import pandas as pd
-import copy
-import random
-
-# single cell package
-import scanpy as sc
-import anndata as ad
-
 # deep learning package
 import torch
-
 from torch.utils.data import Dataset
 from torch.multiprocessing import cpu_count
-import torchvision.transforms as T
-
-import DataLoader_tensor as dl
-
 
 
 class SCDataset(Dataset):

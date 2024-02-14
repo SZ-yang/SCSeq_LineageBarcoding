@@ -115,7 +115,6 @@ def get_stl_dataloader(batch_size, transform=None, split="unlabeled"):
 import matplotlib.pyplot as plt
 
 
-
 class ContrastiveLoss(nn.Module):
     """
     Vanilla Contrastive loss, also called InfoNceLoss as in SimCLR paper

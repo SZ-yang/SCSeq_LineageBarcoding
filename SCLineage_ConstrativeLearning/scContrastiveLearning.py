@@ -16,24 +16,12 @@ import torch
 import torchvision.models as models
 import numpy as np
 import os
-import torch
 import torchvision.transforms as T
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.datasets import STL10
 from torch.utils.data import DataLoader
 from torch.multiprocessing import cpu_count
 import torchvision.transforms as T
-from torch.utils.data import Subset
-
-# self defined modules
-import DataLoader_tensor as dl
-import SCDataset as ds
-
-
-
-
 
 
 def default(val, def_val):
@@ -64,73 +52,6 @@ def weights_update(model, checkpoint_path):
     model.load_state_dict(model_dict)
     print(f'Checkpoint {checkpoint_path} was loaded')
     return model
-
-'''
-class Augment:
-    """
-    A stochastic data augmentation module
-    Transforms any given data example randomly
-    resulting in two correlated views of the same example,
-    denoted x ̃i and x ̃j, which we consider as a positive pair.
-    """
-
-    def __init__(self, img_size, s=1):
-        color_jitter = T.ColorJitter(
-            0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s
-        )
-        # 10% of the image
-        blur = T.GaussianBlur((3, 3), (0.1, 2.0))
-
-        self.train_transform = T.Compose(
-            [
-            T.RandomResizedCrop(size=img_size),
-            T.RandomHorizontalFlip(p=0.5),  # with 0.5 probability
-            T.RandomApply([color_jitter], p=0.8),
-            T.RandomApply([blur], p=0.5),
-            T.RandomGrayscale(p=0.2),
-            # imagenet stats
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ]
-        )
-
-        self.test_transform = T.Compose(
-            [
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    def __call__(self, x):
-        return self.train_transform(x), self.train_transform(x)
-
-'''
-
-
-
-#-------------------------------------------------------------------------------------------------------------------
-# ！！！！
-# 换成scdataloader
-
-def get_stl_dataloader(batch_size, transform=None, split="unlabeled"):
-
-    full_dataset = STL10("./", split=split, transform=transform, download=True)
-    # Define the size of the subset as 40% of the full dataset
-    subset_size = int(0.4 * len(full_dataset))
-
-    # Generate random indices
-    indices = np.random.choice(range(len(full_dataset)), subset_size, replace=False)
-
-    # Create the subset dataset
-    dataset = Subset(full_dataset, indices)
-
-
-    # stl10 = STL10("./", split=split, transform=transform, download=True)
-    return DataLoader(dataset=dataset, batch_size=batch_size, num_workers=cpu_count()//2)
-
-
-#-------------------------------------------------------------------------------------------------------------------
-
 
 
 
@@ -174,41 +95,57 @@ class ContrastiveLoss(nn.Module):
         return loss
 
 
-
 #-------------------------------------------------------------------------------------------------------------------
 """## Add projection Head for embedding and training logic with pytorch lightning model"""
 ### 改掉resnet  换成mlp
 
 import pytorch_lightning as pl
-import torch
 import torch.nn.functional as F
 from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import SGD, Adam
 
 
-class AddProjection(nn.Module):
-    def __init__(self, config, model=None, mlp_dim=512):
-        super(AddProjection, self).__init__()
-        embedding_size = config.embedding_size
-        self.backbone = default(model, models.resnet18(pretrained=False, num_classes=config.embedding_size))
-        mlp_dim = default(mlp_dim, self.backbone.fc.in_features)
-        print('Dim MLP input:',mlp_dim)
-        self.backbone.fc = nn.Identity()
+class AddProjectionMLP(nn.Module):
+    
 
-        # add mlp projection head
+    def __init__(self, config):
+
+        """
+        input_dim: The size of the input features. 
+        hidden_dims: A list of integers where each integer specifies the number of neurons in that hidden layer.
+        embedding_size: The size of the output from the projection head, which is also the size of the final embeddings.
+        """
+        super(AddProjectionMLP, self).__init__()
+
+        # Define the MLP as the base encoder
+        input_dim = config.input_dim
+        hidden_dims = config.hidden_dims
+        embedding_size = config.embedding_size
+
+        layers = []
+        for i in range(len(hidden_dims)):
+            layers.append(nn.Linear(input_dim if i == 0 else hidden_dims[i-1], hidden_dims[i]))
+            layers.append(nn.BatchNorm1d(hidden_dims[i]))
+            layers.append(nn.ReLU(inplace=True))
+        self.base_encoder = nn.Sequential(*layers)
+
+        # Define the projection head
         self.projection = nn.Sequential(
-            nn.Linear(in_features=mlp_dim, out_features=mlp_dim),
-            nn.BatchNorm1d(mlp_dim),
+            nn.Linear(in_features=hidden_dims[-1], out_features=hidden_dims[-1]),
+            nn.BatchNorm1d(hidden_dims[-1]),
             nn.ReLU(),
-            nn.Linear(in_features=mlp_dim, out_features=embedding_size),
+            nn.Linear(in_features=hidden_dims[-1], out_features=embedding_size),
             nn.BatchNorm1d(embedding_size),
         )
 
     def forward(self, x, return_embedding=False):
-        embedding = self.backbone(x)
+        # Flatten the input if necessary
+        x = x.view(x.size(0), -1)
+        embedding = self.base_encoder(x)
         if return_embedding:
             return embedding
         return self.projection(embedding)
+
 #-------------------------------------------------------------------------------------------------------------------
 
 
@@ -235,11 +172,12 @@ def define_param_groups(model, weight_decay, optimizer_name):
 
 
 class SimCLR_pl(pl.LightningModule):
-    def __init__(self, config, model=None, feat_dim=512):
+    def __init__(self, config):
         super().__init__()
         self.config = config
 
-        self.model = AddProjection(config, model=model, mlp_dim=feat_dim)
+        #self.model = AddProjection(config, model=model, mlp_dim=feat_dim)
+        self.model = AddProjectionMLP(config)
 
         self.loss = ContrastiveLoss(config.batch_size, temperature=self.config.temperature)
 
@@ -269,48 +207,103 @@ class SimCLR_pl(pl.LightningModule):
 
         return [optimizer], [scheduler_warmup]
 
+
+#-------------------------------------------------------------------------------------------------------------------
 """## Hyperparameters, and configuration stuff"""
 
 # a lazy way to pass the config file
 class Hparams:
     def __init__(self):
+        self.input_dim = 5000 #number of genes
+        self.hidden_dims = [2048, 1024, 512]
+        self.embedding_size = 128 
+        
         self.epochs = 5 # number of training epochs 300 before changing to 15
         self.seed = 77777 # randomness seed
         self.cuda = True # use nvidia gpu
-        self.img_size = 96 #image shape
+        # self.img_size = 96 #image shape
         self.save = "./saved_models/" # save checkpoint
         self.load = False # load pretrained checkpoint
         self.gradient_accumulation_steps = 5 # gradient accumulation steps
-        self.batch_size = 200 #200. 100000*0.4/200=200
+        self.batch_size = 10 # should be 2*10 in each batch. 
         self.lr = 3e-4 # for ADAm only
         self.weight_decay = 1e-6
-        self.embedding_size= 128 # papers value is 128
         self.temperature = 0.5 # 0.1 or 0.5
-        self.checkpoint_path = './SimCLR_ResNet18.ckpt' # replace checkpoint path here
+        self.checkpoint_path = './scContrastiveLearn.ckpt' # replace checkpoint path here
+#-------------------------------------------------------------------------------------------------------------------
+
 
 """## Pretraining main logic"""
 
-import torch
 from pytorch_lightning import Trainer
 import os
 from pytorch_lightning.callbacks import GradientAccumulationScheduler
 from pytorch_lightning.callbacks import ModelCheckpoint
-from torchvision.models import  resnet18
+# from torchvision.models import  resnet18
+
+import DataLoader_tensor_sparse as dl
+import SCDataset as ds
+
 
 available_gpus = len([torch.cuda.device(i) for i in range(torch.cuda.device_count())])
 save_model_path = os.path.join(os.getcwd(), "saved_models/")
 print('available_gpus:',available_gpus)
-filename='SimCLR_ResNet18_adam_'
+filename='scContrastiveLearn_adam_'
 resume_from_checkpoint = False
 train_config = Hparams()
 
 reproducibility(train_config)
 save_name = filename + '.ckpt'
-
-model = SimCLR_pl(train_config, model=resnet18(pretrained=False), feat_dim=512)
 #-------------------------------------------------------------------------------------------------------------------
-transform = Augment(train_config.img_size)
-data_loader = get_stl_dataloader(train_config.batch_size, transform)
+# model = SimCLR_pl(train_config, model=resnet18(pretrained=False), feat_dim=512)
+model = SimCLR_pl(train_config)
+#-------------------------------------------------DataLoading-------------------------------------------------------
+# transform = Augment(train_config.img_size)
+# data_loader = get_stl_dataloader(train_config.batch_size, transform)
+
+
+import anndata as ad
+import numpy as np
+import scipy
+import pandas as pd
+
+normed_counts = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_normed_counts.mtx.gz"  
+gene_names = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_gene_names.txt.gz" 
+clone_matrix = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_clone_matrix.mtx.gz" 
+metadata = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_metadata.txt.gz" 
+
+# load data
+normed_counts_mat = scipy.io.mmread(normed_counts).tocsr()
+genes = pd.read_csv(gene_names, sep='\t',header=None).to_numpy().flatten()
+clone_mat = scipy.io.mmread(clone_matrix).tocsr()
+meta_df = pd.read_csv(metadata, sep='\t')
+
+# create full adata
+adata = ad.AnnData(normed_counts_mat, obs=meta_df, var=pd.DataFrame(index=genes), dtype=np.float32)
+# optimize dtypes
+adata.obs['Library'] = adata.obs['Library'].astype('category')
+adata.obs['Time point'] = adata.obs['Time point'].astype(int)
+adata.obs['Starting population'] = adata.obs['Starting population'].astype('category')
+adata.obs['Cell type annotation'] = adata.obs['Cell type annotation'].astype('category')
+adata.obs['Well'] = adata.obs['Well'].astype(int)
+# assign clone_id
+adata.obs['clone_id'] = (clone_mat @ np.arange(1,1+clone_mat.shape[1])) - 1
+print("number of lineages: ", len(adata.obs['clone_id'].unique()))
+# input data
+count_matrix = adata.X
+cell_lineage = adata.obs['clone_id'].values.reshape(-1, 1)
+count_matrix.shape, cell_lineage.shape
+# step 1 generate designed batches
+# batchsize = 10
+DLoader = dl.SClineage_DataLoader(count_matrix,cell_lineage,batch_size= train_config.batch_size, seed=7)
+batch_all, num_batch = DLoader.batch_generator()
+# step 2 generate real dataloader
+sc_dataset = ds.SCDataset(batches=batch_all)
+
+print("number of batches: ", num_batch)
+
+data_loader = torch.utils.data.DataLoader(dataset=sc_dataset, batch_size=train_config.batch_size, shuffle=False, num_workers=cpu_count()//2)
+
 #-------------------------------------------------------------------------------------------------------------------
 
 accumulator = GradientAccumulationScheduler(scheduling={0: train_config.gradient_accumulation_steps})
@@ -332,19 +325,27 @@ trainer.fit(model, data_loader)
 
 
 trainer.save_checkpoint(save_name)
-# from google.colab import files
-# files.download(save_name)
 
+#-------------------------------------------------------------------------------------------------------------------
 """## Save only backbone weights from Resnet18 that are only necessary for fine tuning"""
 
-model_pl = SimCLR_pl(train_config, model=resnet18(pretrained=False))
-model_pl = weights_update(model_pl, "SimCLR_ResNet18_adam_.ckpt")
+# model_pl = SimCLR_pl(train_config, model=resnet18(pretrained=False))
+# model_pl = weights_update(model_pl, "SimCLR_ResNet18_adam_.ckpt")
 
-resnet18_backbone_weights = model_pl.model.backbone
-print(resnet18_backbone_weights)
+# resnet18_backbone_weights = model_pl.model.backbone
+# print(resnet18_backbone_weights)
+# torch.save({
+#             'model_state_dict': resnet18_backbone_weights.state_dict(),
+#             }, 'resnet18_backbone_weights.ckpt')
+
+model_pl = SimCLR_pl(train_config)
+model_pl = weights_update(model_pl, "scContrastiveLearn_adam_.ckpt")
+
+baseencoder_backbone_weights = model_pl.model.backbone
+print(baseencoder_backbone_weights)
 torch.save({
-            'model_state_dict': resnet18_backbone_weights.state_dict(),
-            }, 'resnet18_backbone_weights.ckpt')
+            'model_state_dict': baseencoder_backbone_weights.state_dict(),
+            }, 'baseencoder_backbone_weights.ckpt')
 
-
+#-------------------------------------------------------------------------------------------------------------------
 
