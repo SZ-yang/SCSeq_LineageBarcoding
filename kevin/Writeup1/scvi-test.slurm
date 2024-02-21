@@ -11,4 +11,4 @@
 #SBATCH --output=/home/users/%u/kzlinlab/projects/lineageBarcodingVAE/out/kevin/Writeup1/slurm/slurm_%j.out
 
 conda activate scVI
-python scvi-test.py > ../../../../../out/kevin/Writeup1/slurm/$SLURM_JOB_NAME-$SLURM_JOB_ID.txt
+python scvi-test.py > ../../../../out/kevin/Writeup1/slurm/$SLURM_JOB_NAME-$SLURM_JOB_ID.txt
