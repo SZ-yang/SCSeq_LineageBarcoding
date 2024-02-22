@@ -12,4 +12,4 @@
 
 conda init
 conda activate scVI
-python scvi-test.py > ../../../../out/kevin/Writeup1/slurm/$SLURM_JOB_NAME-$SLURM_JOB_ID.txt
+python scvi-test_part1.py > ../../../../out/kevin/Writeup1/slurm/$SLURM_JOB_NAME-$SLURM_JOB_ID.txt

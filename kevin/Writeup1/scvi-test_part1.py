@@ -1,3 +1,5 @@
+# https://docs.scvi-tools.org/en/stable/tutorials/notebooks/quick_start/api_overview.html
+
 import os
 import tempfile
 import scanpy as sc
@@ -31,6 +33,7 @@ sc.pp.highly_variable_genes(
     flavor="seurat_v3",
     batch_key="cell_source",
 )
+adata
 
 scvi.model.SCVI.setup_anndata(
     adata,
@@ -40,7 +43,6 @@ scvi.model.SCVI.setup_anndata(
 )
 
 model = scvi.model.SCVI(adata)
-
 model
 
 model.train()
