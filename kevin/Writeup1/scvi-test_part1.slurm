@@ -10,6 +10,11 @@
 #SBATCH --error=/home/users/%u/kzlinlab/projects/lineageBarcodingVAE/out/kevin/Writeup1/slurm/slurm_%j.err
 #SBATCH --output=/home/users/%u/kzlinlab/projects/lineageBarcodingVAE/out/kevin/Writeup1/slurm/slurm_%j.out
 
-conda init
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate scVI
+
+conda env list
+python --version
+conda list
+
 python scvi-test_part1.py > ../../../../out/kevin/Writeup1/slurm/$SLURM_JOB_NAME-$SLURM_JOB_ID.txt

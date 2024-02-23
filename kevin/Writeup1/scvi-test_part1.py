@@ -35,6 +35,8 @@ sc.pp.highly_variable_genes(
 )
 adata
 
+adata.write_h5ad(filename = "/home/users/kzlin/kzlinlab/projects/lineageBarcodingVAE/out/kevin/Writeup1/scvi_adata.h5ad")
+
 scvi.model.SCVI.setup_anndata(
     adata,
     layer="counts",
