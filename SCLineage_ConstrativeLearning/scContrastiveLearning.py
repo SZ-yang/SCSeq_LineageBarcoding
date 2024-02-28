@@ -1,15 +1,7 @@
 # general package
 import tempfile
 import os
-import scipy
 import numpy as np
-import pandas as pd
-import copy
-import random
-
-# single cell package
-import scanpy as sc
-import anndata as ad
 
 # deep learning package
 import torch
@@ -19,10 +11,17 @@ import os
 import torchvision.transforms as T
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 from torch.multiprocessing import cpu_count
 import torchvision.transforms as T
 
+import pytorch_lightning as pl
+import torch.nn.functional as F
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
+from torch.optim import Adam
+
+import time
+start_time = time.time()
+print("start time:", start_time)
 
 def default(val, def_val):
     return def_val if val is None else val
@@ -96,24 +95,16 @@ class ContrastiveLoss(nn.Module):
 
 
 #-------------------------------------------------------------------------------------------------------------------
-"""## Add projection Head for embedding and training logic with pytorch lightning model"""
-### 改掉resnet  换成mlp
-
-import pytorch_lightning as pl
-import torch.nn.functional as F
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
-from torch.optim import SGD, Adam
-
+"""Add projection Head for embedding"""
+### resnetをmlpに置き換える。
 
 class AddProjectionMLP(nn.Module):
-    
-
     def __init__(self, config):
 
         """
         input_dim: The size of the input features. 
         hidden_dims: A list of integers where each integer specifies the number of neurons in that hidden layer.
-        embedding_size: The size of the output from the projection head, which is also the size of the final embeddings.
+        embedding_size: The size of the output from the projection head.
         """
         super(AddProjectionMLP, self).__init__()
 
@@ -145,6 +136,16 @@ class AddProjectionMLP(nn.Module):
         if return_embedding:
             return embedding
         return self.projection(embedding)
+
+    # extract the features geenerated by the base encoder 
+    def get_features(self, x):
+        """
+        Extracts features from the base encoder.
+        """
+        x = x.view(x.size(0), -1)  # Flatten the input if necessary
+        features = self.base_encoder(x)
+        return features
+
 
 #-------------------------------------------------------------------------------------------------------------------
 
@@ -185,7 +186,8 @@ class SimCLR_pl(pl.LightningModule):
         return self.model(X)
 
     def training_step(self, batch, batch_idx):
-        (x1, x2), labels = batch
+        # print(batch)
+        x1, x2= batch
         z1 = self.model(x1)
         z2 = self.model(x2)
         loss = self.loss(z1, z2)
@@ -208,20 +210,21 @@ class SimCLR_pl(pl.LightningModule):
         return [optimizer], [scheduler_warmup]
 
 
+
 #-------------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------Training Step----------------------------------------------------
 """## Hyperparameters, and configuration stuff"""
 
 # a lazy way to pass the config file
 class Hparams:
     def __init__(self):
-        self.input_dim = 5000 #number of genes
-        self.hidden_dims = [2048, 1024, 512]
-        self.embedding_size = 128 
+        self.input_dim = 2000 #number of genes
+        self.hidden_dims = [1024, 512, 256, 128, 64] # [1024, 512, 256, 128, 30] want to be 30
+        self.embedding_size = 32 #50 (128 for image contrastive learn)
         
-        self.epochs = 5 # number of training epochs 300 before changing to 15
+        self.epochs = 220 # number of training epochs 300 before changing to 15
         self.seed = 77777 # randomness seed
         self.cuda = True # use nvidia gpu
-        # self.img_size = 96 #image shape
         self.save = "./saved_models/" # save checkpoint
         self.load = False # load pretrained checkpoint
         self.gradient_accumulation_steps = 5 # gradient accumulation steps
@@ -241,9 +244,6 @@ from pytorch_lightning.callbacks import GradientAccumulationScheduler
 from pytorch_lightning.callbacks import ModelCheckpoint
 # from torchvision.models import  resnet18
 
-import DataLoader_tensor_sparse as dl
-import SCDataset as ds
-
 
 available_gpus = len([torch.cuda.device(i) for i in range(torch.cuda.device_count())])
 save_model_path = os.path.join(os.getcwd(), "saved_models/")
@@ -255,55 +255,17 @@ train_config = Hparams()
 reproducibility(train_config)
 save_name = filename + '.ckpt'
 #-------------------------------------------------------------------------------------------------------------------
-# model = SimCLR_pl(train_config, model=resnet18(pretrained=False), feat_dim=512)
+
 model = SimCLR_pl(train_config)
 #-------------------------------------------------DataLoading-------------------------------------------------------
-# transform = Augment(train_config.img_size)
-# data_loader = get_stl_dataloader(train_config.batch_size, transform)
+import Larry_Dataloader as LD
 
 
-import anndata as ad
-import numpy as np
-import scipy
-import pandas as pd
+larry_dataset, lineage_info = LD.Larry_DataLoader(train_config.input_dim,train_config.batch_size)
+data_loader = torch.utils.data.DataLoader(dataset=larry_dataset, batch_size=train_config.batch_size, shuffle=False, num_workers=1) #num_workers=cpu_count()//2
 
-normed_counts = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_normed_counts.mtx.gz"  
-gene_names = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_gene_names.txt.gz" 
-clone_matrix = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_clone_matrix.mtx.gz" 
-metadata = "/home/users/syang71/Dataset/Larry_Dataset_normalized/stateFate_inVitro_metadata.txt.gz" 
-
-# load data
-normed_counts_mat = scipy.io.mmread(normed_counts).tocsr()
-genes = pd.read_csv(gene_names, sep='\t',header=None).to_numpy().flatten()
-clone_mat = scipy.io.mmread(clone_matrix).tocsr()
-meta_df = pd.read_csv(metadata, sep='\t')
-
-# create full adata
-adata = ad.AnnData(normed_counts_mat, obs=meta_df, var=pd.DataFrame(index=genes), dtype=np.float32)
-# optimize dtypes
-adata.obs['Library'] = adata.obs['Library'].astype('category')
-adata.obs['Time point'] = adata.obs['Time point'].astype(int)
-adata.obs['Starting population'] = adata.obs['Starting population'].astype('category')
-adata.obs['Cell type annotation'] = adata.obs['Cell type annotation'].astype('category')
-adata.obs['Well'] = adata.obs['Well'].astype(int)
-# assign clone_id
-adata.obs['clone_id'] = (clone_mat @ np.arange(1,1+clone_mat.shape[1])) - 1
-print("number of lineages: ", len(adata.obs['clone_id'].unique()))
-# input data
-count_matrix = adata.X
-cell_lineage = adata.obs['clone_id'].values.reshape(-1, 1)
-count_matrix.shape, cell_lineage.shape
-# step 1 generate designed batches
-# batchsize = 10
-DLoader = dl.SClineage_DataLoader(count_matrix,cell_lineage,batch_size= train_config.batch_size, seed=7)
-batch_all, num_batch = DLoader.batch_generator()
-# step 2 generate real dataloader
-sc_dataset = ds.SCDataset(batches=batch_all)
-
-print("number of batches: ", num_batch)
-
-data_loader = torch.utils.data.DataLoader(dataset=sc_dataset, batch_size=train_config.batch_size, shuffle=False, num_workers=cpu_count()//2)
-
+# save the lineage info for UMAP plotting
+np.save('/home/users/syang71/kzlinlab/projects/lineageBarcodingCL/git/scContrastiveLearn_Joshua/lineage_info.npy', lineage_info)
 #-------------------------------------------------------------------------------------------------------------------
 
 accumulator = GradientAccumulationScheduler(scheduling={0: train_config.gradient_accumulation_steps})
@@ -311,11 +273,13 @@ checkpoint_callback = ModelCheckpoint(filename=filename, dirpath=save_model_path
                                         save_last=True, save_top_k=2,monitor='Contrastive loss_epoch',mode='min')
 
 if resume_from_checkpoint:
+  print("resume from the checkpoint.")
   trainer = Trainer(callbacks=[accumulator, checkpoint_callback],
                   gpus=available_gpus,
                   max_epochs=train_config.epochs,
                   resume_from_checkpoint=train_config.checkpoint_path)
 else:
+  print("train from the begining.")
   trainer = Trainer(callbacks=[accumulator, checkpoint_callback],
                   gpus=available_gpus,
                   max_epochs=train_config.epochs)
@@ -326,26 +290,46 @@ trainer.fit(model, data_loader)
 
 trainer.save_checkpoint(save_name)
 
+
+#-------------------------------------Extract Features generated by the base encoder-------------------------------
+model.eval()  # Set the model to evaluation mode
+model.to('cuda' if torch.cuda.is_available() else 'cpu')  # Move model to the appropriate device
+
+features_list = []
+for batch in data_loader:  
+    X, _ = batch  # Adjust based on your DataLoader's output format
+    X = X.to(next(model.parameters()).device)  # Ensure X is on the correct device
+    with torch.no_grad():  # No need to compute gradients
+        batch_features = model.model.get_features(X)  # Extract features
+    features_list.append(batch_features.cpu().detach().numpy())  # Store features as NumPy array
+
+# Concatenate all batch features into a single NumPy array
+features = np.concatenate(features_list, axis=0)
+
+print("Shape of the feature representation generated by the base encoder:", features.shape)
+np.save('/home/users/syang71/kzlinlab/projects/lineageBarcodingCL/git/scContrastiveLearn_Joshua/scBaseEncoderFeat.npy', features)
+
 #-------------------------------------------------------------------------------------------------------------------
 """## Save only backbone weights from Resnet18 that are only necessary for fine tuning"""
-
-# model_pl = SimCLR_pl(train_config, model=resnet18(pretrained=False))
-# model_pl = weights_update(model_pl, "SimCLR_ResNet18_adam_.ckpt")
-
-# resnet18_backbone_weights = model_pl.model.backbone
-# print(resnet18_backbone_weights)
-# torch.save({
-#             'model_state_dict': resnet18_backbone_weights.state_dict(),
-#             }, 'resnet18_backbone_weights.ckpt')
-
 model_pl = SimCLR_pl(train_config)
 model_pl = weights_update(model_pl, "scContrastiveLearn_adam_.ckpt")
 
-baseencoder_backbone_weights = model_pl.model.backbone
+baseencoder_backbone_weights = model_pl.model.base_encoder.state_dict()
+# # Saving base encoder weights
+# base_encoder_weights = model_pl.model.base_encoder.state_dict()
+# torch.save(base_encoder_weights, 'base_encoder_weights.ckpt')
+
+# # Saving projection head weights
+# projection_head_weights = model_pl.model.projection.state_dict()
+# torch.save(projection_head_weights, 'projection_head_weights.ckpt')
+
 print(baseencoder_backbone_weights)
 torch.save({
-            'model_state_dict': baseencoder_backbone_weights.state_dict(),
-            }, 'baseencoder_backbone_weights.ckpt')
+            'model_state_dict': baseencoder_backbone_weights,
+            }, 'baseencoder_weights.ckpt')
 
 #-------------------------------------------------------------------------------------------------------------------
 
+end_time = time.time()
+print("end time:", end_time)
+print(f"Execution time: {end_time - start_time} seconds")
