@@ -6,6 +6,7 @@ Deep-learning embedding for static lineage barcoded single-cell RNA-seq data und
 | Larry Dataset        | 130887      | 5864                     | 25289        | 11(including undiff) | 2,4,6      |
 | Larry Dataset for CL | 41201       | 2817                     | 2000         | 11(including undiff) | 2,4,6      |
 
+Loss Function:
 
 $$
 loss_{m,n} = - \log \frac{\exp(\text{sim}(z_m, z_n)/\tau)}
