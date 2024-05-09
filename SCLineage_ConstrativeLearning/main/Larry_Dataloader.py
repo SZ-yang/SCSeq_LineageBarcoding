@@ -3,10 +3,10 @@ import numpy as np
 import scipy
 import pandas as pd
 import scanpy as sc
-import DataLoader_tensor_sparse as dl
+import SCSeq_LineageBarcoding2.SCSeq_LineageBarcoding.SCLineage_ConstrativeLearning.main.DataLoader_tensor_sparse as dl
 import SCDataset as ds
 
-def Larry_DataLoader(num_genes, batch_size):
+def Larry_DataLoader(num_genes, batch_size, batch_seed):
 
 #---------------------------------------------------------Load the matrixs-----------------------------------------------------
 
@@ -81,12 +81,20 @@ def Larry_DataLoader(num_genes, batch_size):
 
     # step 1 generate designed batches
     # batchsize = 10
-    DLoader = dl.SClineage_DataLoader(count_matrix,cell_lineage,batch_size= batch_size, seed=7)
+    DLoader = dl.SClineage_DataLoader(count_matrix,cell_lineage,batch_size= batch_size, seed=batch_seed)
     batch_all, num_batch, lineage_info = DLoader.batch_generator()
     # step 2 generate real dataloader
-    sc_dataset = ds.SCDataset(batches=batch_all)
+    # sc_dataset = ds.SCDataset(batches=batch_all)
 
     print("number of batches: ", num_batch)
     print("total number of pairs: ", num_batch*batch_size)
 
-    return sc_dataset, lineage_info
+    return batch_all, lineage_info, num_batch
+
+if __name__ == "__main__":
+    import torch
+    larry_dataset, lineage_info = Larry_DataLoader(2000,10)
+    data_loader = torch.utils.data.DataLoader(dataset=larry_dataset, batch_size=10, shuffle=False, num_workers=1) #num_workers=cpu_count()//2
+
+    # save the lineage info for UMAP plotting
+    np.save('/home/users/syang71/kzlinlab/projects/scContrastiveLearn/git/scContrastiveLearn_Joshua/lineage_info_322.npy', lineage_info)
