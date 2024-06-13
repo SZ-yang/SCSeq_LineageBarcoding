@@ -1,0 +1,3 @@
+conda create -n scVI python=3.9
+conda activate scVI
+pip install scvi-tools scanpy torch torchvision torchaudio seaborn scikit-misc
