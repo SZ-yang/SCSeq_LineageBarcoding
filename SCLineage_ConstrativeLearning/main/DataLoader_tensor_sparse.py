@@ -191,18 +191,23 @@ if __name__ == "__main__":
     data = sp.csr_matrix(data)
     lineages = np.random.randint(0, M, size=(n, 1))  # Random group labels
 
-    print("num_batches","len(lineage_info)", "loader.avail_lineages")
-    for i in range(10):
-        loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=10)
-        batches, num_batches, lineage_info = loader.batch_generator()
-        
-        print(num_batches, len(lineage_info), loader.avail_lineages)
-    
+    loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=10)
+    batches, num_batches, lineage_info = loader.batch_generator()
+    print(len(batches[1]))
     print("---------------------")
-    print("num_batches","len(lineage_info)", "loader.avail_lineages")
-    for i in range(10):
-        loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=None)
-        batches, num_batches, lineage_info = loader.batch_generator()
+    print(batches[1])
+    # print("num_batches","len(lineage_info)", "loader.avail_lineages")
+    # for i in range(10):
+    #     loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=10)
+    #     batches, num_batches, lineage_info = loader.batch_generator()
         
-        print(num_batches, len(lineage_info), loader.avail_lineages)
+    #     print(num_batches, len(lineage_info), loader.avail_lineages)
+    
+    # print("---------------------")
+    # print("num_batches","len(lineage_info)", "loader.avail_lineages")
+    # for i in range(10):
+    #     loader = SClineage_DataLoader(data, lineages, batch_size=10, seed=None)
+    #     batches, num_batches, lineage_info = loader.batch_generator()
+        
+    #     print(num_batches, len(lineage_info), loader.avail_lineages)
 
