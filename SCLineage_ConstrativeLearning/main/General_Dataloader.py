@@ -24,11 +24,11 @@ def General_DataLoader(file_path, batch_size, size_factor, batch_seed):
     return batch_all, lineage_info, num_batch
 
 if __name__ == "__main__":
-    # file_path = "/home/users/syang71/Dataset/LarrayData_day2.h5ad"
-    file_path = "/Users/apple/Desktop/KB/data/LarryData/Larry_41201_2000.h5ad"
+    file_path = "/home/users/syang71/Dataset/Larry_41201_2000.h5ad"
+    # file_path = "/Users/apple/Desktop/KB/data/LarryData/Larry_41201_2000.h5ad"
     
     batch_size = 15
     size_factor = 0.2
     batch_all, lineage_info, num_batch = General_DataLoader(file_path,batch_size, size_factor, 42)
-    print(len(batch_all.keys()))
+    print(lineage_info.shape)
     

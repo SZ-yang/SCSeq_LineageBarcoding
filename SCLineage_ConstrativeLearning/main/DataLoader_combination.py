@@ -133,7 +133,7 @@ class SClineage_DataLoader:
         print(f"The range of number of cells in a lineage: {min_length, max_length}, average of number of cells in a lineage {mean_length}")
         num_batch = len(self.batch_all.keys())
 
-        return self.batch_all, num_batch, self.lineage_info
+        return self.batch_all, num_batch, self.lineage_array
         
 if __name__ == "__main__":
     do_ = 1
