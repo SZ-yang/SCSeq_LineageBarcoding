@@ -16,7 +16,12 @@ class SClineage_DataLoader:
             size_factor(float): range from 0 to 1.
             seed (int): Random seed for reproducibility.
         """
-        self.count_matrix = count_matrix.toarray()
+        try:
+        # Attempt to call toarray() method
+            self.count_matrix = count_matrix.toarray()
+        except AttributeError:
+        # Fallback if count_matrix has no toarray() method
+            self.count_matrix = count_matrix
         self.lineages = lineages
         self.batch_size = batch_size
         self.size_factor = size_factor
