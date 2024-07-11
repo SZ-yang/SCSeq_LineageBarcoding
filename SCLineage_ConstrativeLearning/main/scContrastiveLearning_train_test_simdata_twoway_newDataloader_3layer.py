@@ -35,7 +35,6 @@ from pytorch_lightning.callbacks import Callback
 
 # self-written packages
 from scContrastiveLearning_Model import AddProjectionMLP, ContrastiveLoss
-import Larry_Dataloader as LD
 import General_Dataloader as GD
 import SCDataset as ds
 
@@ -46,9 +45,10 @@ def get_args():
     parser = argparse.ArgumentParser(description="Run the contrastive learning model on provided single-cell data.")
     parser.add_argument('--inputFilePath', type=str, help='Anndata for running the algorithm')
     parser.add_argument('--batch_size', type=int, default=25, help='Batch size for training and validation')
+    parser.add_argument('--size_factor', type=float, default=0.3, help='size factor range from 0 to 1')
     parser.add_argument('--temperature', type=float, default=0.5, help='Temperature parameter for contrastive loss')
     parser.add_argument('--output_dir', type=str)
-    parser.add_argument('--train_test', default=1, type=int, help='1: split the data for train and validiation; 0: o.w.')
+    parser.add_argument('--train_test', default=0, type=int, help='1: split the data for train and validiation; 0: o.w.')
 
     return parser.parse_args()
 
@@ -187,11 +187,13 @@ class LossCallback(Callback):
 class Hparams:
     def __init__(self):
         self.input_dim = 2000  # number of genes
-        self.hidden_dims = [1024, 512, 256, 128, 64]  # various hidden layer sizes
+        # self.hidden_dims = [1024, 512, 256, 128, 64]  # various hidden layer sizes
+        self.hidden_dims = [1024, 256, 64]
         self.embedding_size = 32  # size of the output embeddings
         
         self.epochs = 220  # number of training epochs
         self.batch_size = args.batch_size  # batch size default 10 
+        self.size_factor = args.size_factor
         self.temperature = args.temperature # temperature parameter for contrastive loss default 0.5
         self.train_test_ratio = 0.8  # ratio for splitting train/test data
         
@@ -243,6 +245,7 @@ model = scContraLearn(train_config)
 print("-------------------------------------------scContrastive Learning---------------------------------------------------")
 print("#----------------------------------------------Hyper Parameters-----------------------------------------------------")
 print("batch_size: ", train_config.batch_size)
+print("size_factor: ", train_config.size_factor)
 print("temperature: " , train_config.temperature)
 print("nuumber of epochs: ", train_config.epochs)
 print("train_test_ratio: ", train_config.train_test_ratio)
@@ -256,7 +259,7 @@ print("#-------------------------------------------------DataLoading------------
 
 random.seed(train_config.train_test_seed) 
 print("Anndata Info: ", train_config.file_path)
-batch_all, lineage_info, num_batch = GD.General_DataLoader(train_config.file_path,train_config.batch_size, train_config.batch_seed)
+batch_all, lineage_info, num_batch = GD.General_DataLoader(train_config.file_path,train_config.batch_size,train_config.size_factor, train_config.batch_seed)
 print("#-------------------------------------------------Training-------------------------------------------------------")
 #-------------------------------------------------train and valiation-------------------------------------------------------"
 if train_config.train_test:
@@ -280,7 +283,6 @@ if train_config.train_test:
     print(f"number of validation batch: {len(val_batch.keys())}")
 
     # split lineage info for train and validation set 
-
     train_batch_indices = []
     for key in train_batch_keys:
         train_batch_indices.extend(range((key - 1) * train_config.batch_size, key * train_config.batch_size))
