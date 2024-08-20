@@ -4,6 +4,7 @@ import random
 import os
 import numpy as np
 import anndata as ad
+import multiprocessing
 
 # Deep learning packages
 import torch
@@ -33,6 +34,8 @@ def get_args():
     parser.add_argument('--max_epoch', type=int, default=220, help='Maximum number of epochs')
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save outputs')
     parser.add_argument('--train_test', default=0, type=int, help='1: split the data for train and validation; 0: otherwise')
+    parser.add_argument('--hidden_dims', default=[1024, 256, 64], type=lambda s: [int(item) for item in s.split(',')], help='dimensions of each layer of base encoder. example input: 1024,256,64')
+    parser.add_argument('--embedding_size', default=32, type=int, help='the output dimension of projection head')
     parser.add_argument('--resume_from_checkpoint', type=str, help='Path to a checkpoint to resume from', default=None)
     return parser.parse_args()
 
@@ -133,8 +136,10 @@ class SaveCheckpointCallback(Callback):
 class Hparams:
     def __init__(self, args):
         self.input_dim = 2000  # number of genes
-        self.hidden_dims = [1024, 256, 64]
-        self.embedding_size = 32  # size of the output embeddings
+        # self.hidden_dims = [1024, 256, 64]
+        # self.embedding_size = 32  # size of the output embeddings
+        self.hidden_dims = args.hidden_dims
+        self.embedding_size = args.embedding_size # size of the output embeddings
 
         self.epochs = args.max_epoch  # number of training epochs
         self.batch_size = args.batch_size
@@ -163,6 +168,11 @@ class Hparams:
 def prepare_data_loaders(config):
     batch_all, lineage_info, num_batch = GD.General_DataLoader(config.file_path, config.batch_size, config.size_factor, config.batch_seed)
     
+    # Determine the number of available CPU cores
+    num_workers = min(12, multiprocessing.cpu_count())  # Use up to 12 workers or the number of available CPU cores
+    print("num_workers(number of available CPU cores): ", num_workers)
+
+
     if config.train_test:
         train_batch_keys = random.sample(list(batch_all.keys()), int(config.train_test_ratio * num_batch))
         train_batch = {key: batch_all[key] for key in train_batch_keys}
@@ -194,8 +204,8 @@ def prepare_data_loaders(config):
         np.save(config.out_dir+ f'/val_lineage_info_bs{config.batch_size}_tau{config.temperature}.npy', val_lineage_info)
 
         return {
-            'train': DataLoader(ds.SCDataset(batches=train_batch), batch_size=config.batch_size, shuffle=False, num_workers=1),
-            'val': DataLoader(ds.SCDataset(batches=val_batch), batch_size=config.batch_size, shuffle=False, num_workers=1)
+            'train': DataLoader(ds.SCDataset(batches=train_batch), batch_size=config.batch_size, shuffle=False, num_workers=num_workers),
+            'val': DataLoader(ds.SCDataset(batches=val_batch), batch_size=config.batch_size, shuffle=False, num_workers=num_workers)
         }
     else:
         print("Training the data with the whole dataset")
@@ -205,7 +215,7 @@ def prepare_data_loaders(config):
         np.save(config.out_dir+ f'/lineage_info_bs{config.batch_size}_tau{config.temperature}.npy', lineage_info)
         
         return {
-            'all': DataLoader(ds.SCDataset(batches=batch_all), batch_size=config.batch_size, shuffle=False, num_workers=1)
+            'all': DataLoader(ds.SCDataset(batches=batch_all), batch_size=config.batch_size, shuffle=False, num_workers=num_workers)
         }
 
 
@@ -290,35 +300,38 @@ def main():
     model.eval()  # Set the model to evaluation mode
     model.to('cuda' if torch.cuda.is_available() else 'cpu')  # Move model to the appropriate device
 
-    features_list_X = []
-    features_list_Y = []
+    # features_list_X = []
+    # features_list_Y = []
 
-    if train_config.train_test:
-        train_loader = data_loaders['train']
-    else:
-        train_loader = data_loaders['all']
+    # if train_config.train_test:
+    #     train_loader = data_loaders['train']
+    # else:
+    #     train_loader = data_loaders['all']
 
-    for batch in train_loader:  
-        X, Y = batch
-        X = X.to(next(model.parameters()).device)  # Ensure X is on the correct device
-        Y = Y.to(next(model.parameters()).device)
-        with torch.no_grad():  # No need to compute gradients
-            batch_features_X = model.model.get_features(X)  # Extract features
-            batch_features_Y = model.model.get_features(Y)
-        features_list_X.append(batch_features_X.cpu().detach().numpy())  # Store features as NumPy array
-        features_list_Y.append(batch_features_Y.cpu().detach().numpy())
+    # for batch in train_loader:  
+    #     X, Y = batch
+    #     X = X.to(next(model.parameters()).device)  # Ensure X is on the correct device
+    #     Y = Y.to(next(model.parameters()).device)
+    #     with torch.no_grad():  # No need to compute gradients
+    #         batch_features_X = model.model.get_features(X)  # Extract features
+    #         batch_features_Y = model.model.get_features(Y)
+    #     features_list_X.append(batch_features_X.cpu().detach().numpy())  # Store features as NumPy array
+    #     features_list_Y.append(batch_features_Y.cpu().detach().numpy())
 
-    # Concatenate all batch features into a single NumPy array
-    features_X = np.concatenate(features_list_X, axis=0)
-    features_Y = np.concatenate(features_list_Y, axis=0)
+    # # Concatenate all batch features into a single NumPy array
+    # features_X = np.concatenate(features_list_X, axis=0)
+    # features_Y = np.concatenate(features_list_Y, axis=0)
 
-    print("Shape of the feature representation generated by the base encoder:", features_X.shape, features_Y.shape)
-    np.save(train_config.out_dir+f'/scBaseEncoderFeat_X_bs{train_config.batch_size}_tau{train_config.temperature}.npy', features_X)
-    np.save(train_config.out_dir+f'/scBaseEncoderFeat_Y_bs{train_config.batch_size}_tau{train_config.temperature}.npy', features_Y)
+    # print("Shape of the feature representation generated by the base encoder:", features_X.shape, features_Y.shape)
+    # np.save(train_config.out_dir+f'/scBaseEncoderFeat_X_bs{train_config.batch_size}_tau{train_config.temperature}.npy', features_X)
+    # np.save(train_config.out_dir+f'/scBaseEncoderFeat_Y_bs{train_config.batch_size}_tau{train_config.temperature}.npy', features_Y)
 
 
     ##------------------------------Extract Features generated by the base encoder for cells----------------------------
     print("#--------------------------------------------Feature Extracting(pairs)------------------------------------------------------")
+    model.eval()  # Set the model to evaluation mode
+    model.to('cuda' if torch.cuda.is_available() else 'cpu')  # Move model to the appropriate device
+
 
     adata_subset = ad.read_h5ad(train_config.file_path)
     count_matrix = adata_subset.X
