@@ -62,6 +62,7 @@ predict_lineages_custom <- function(
     results <- results + best_prediction
   }
   
+  GEMLI_items[["markers"]] <- marker_genes
   GEMLI_items[["prediction"]] <- results
   return(GEMLI_items)
 }

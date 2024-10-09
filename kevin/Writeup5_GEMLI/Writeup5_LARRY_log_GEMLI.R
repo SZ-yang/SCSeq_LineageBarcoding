@@ -46,7 +46,7 @@ GEMLI_items[['barcodes']] <- seurat_obj$clone_id
 
 set.seed(10)
 GEMLI_items <- predict_lineages_custom(GEMLI_items,
-                                       desired_cluster_size = c(1, 1e4),
+                                       desired_cluster_size = c(50,200),
                                        verbose = 1)
 
 save(date_of_run, session_info,
@@ -57,7 +57,7 @@ zz <- GEMLI_items[['prediction']] # we need to look at how they did it on LARRY.
 quantile(zz[zz!=0])
 
 GEMLI_items <- GEMLI::test_lineages(GEMLI_items, 
-                                    valid_fam_sizes = 1:1e4)
+                                    valid_fam_sizes = 50:200)
 GEMLI_items$testing_results
 
 save(date_of_run, session_info,
