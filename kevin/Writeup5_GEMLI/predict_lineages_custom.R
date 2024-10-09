@@ -1,11 +1,13 @@
-predict_lineages_custom <- function(GEMLI_items, 
-                                    bool_set_seed = TRUE,
-                                    desired_cluster_size = c(2,3), 
-                                    fast = TRUE,
-                                    repetitions = 100, 
-                                    sample_size = (2/3), 
-                                    verbose = 0) # check
-{
+predict_lineages_custom <- function(
+    GEMLI_items, 
+    bool_find_markers = TRUE,
+    bool_set_seed = TRUE,
+    desired_cluster_size = c(0, 1e4), 
+    fast = TRUE,
+    repetitions = 100, 
+    sample_size = (2/3), 
+    verbose = 0
+) {
   data_matrix <- GEMLI_items[['gene_expression']]
   
   # check
@@ -14,7 +16,12 @@ predict_lineages_custom <- function(GEMLI_items,
   stopifnot(all(colsum_vec != 0), all(rowsum_vec != 0))
   
   if(verbose > 0) print("Compute potential markers")
-  marker_genes <- GEMLI::potential_markers(data_matrix)
+  if(bool_find_markers) {
+    marker_genes <- GEMLI::potential_markers(data_matrix)
+    marker_genes <- intersect(marker_genes, rownames(data_matrix))
+  } else {
+    marker_genes <- rownames(data_matrix)
+  }
   results <- data.matrix(matrix(0, nrow=ncol(data_matrix), ncol=ncol(data_matrix)))
   rownames(results) <- colnames(data_matrix)
   colnames(results) <- colnames(data_matrix)
@@ -23,8 +30,10 @@ predict_lineages_custom <- function(GEMLI_items,
     if(verbose > 0) print(paste0("On iteration ", i, " in ", repetitions))
     
     if(bool_set_seed) set.seed(10*i)
-    marker_genes_sample <- sample(intersect(marker_genes, rownames(data_matrix)), 
-                                  round(length(intersect(marker_genes, rownames(data_matrix)))*sample_size,0))
+    
+    marker_genes_sample <- sample(marker_genes, 
+                                  round(length(marker_genes)*sample_size, 0))
+    
     # the main workhorse
     cell_clusters <- quantify_clusters_iterative_custom(data_matrix, 
                                                         marker_genes_sample, 

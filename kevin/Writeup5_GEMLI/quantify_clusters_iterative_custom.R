@@ -1,4 +1,6 @@
-quantify_clusters_iterative_custom <- function(data_matrix, marker_genes, N=2, fast=FALSE){
+quantify_clusters_iterative_custom <- function(
+    data_matrix, marker_genes, N=2, fast=FALSE
+){
   iterate <- TRUE
   i <- 2
   genes <- intersect(marker_genes, rownames(data_matrix)[rowMeans(data_matrix)>0])
@@ -20,8 +22,8 @@ quantify_clusters_iterative_custom <- function(data_matrix, marker_genes, N=2, f
     
     for (cluster in setdiff(unique(cell_clusters[,(i-1)]),0)) {
       cells_in_cluster <- rownames(cell_clusters)[cell_clusters[,(i-1)] == cluster]
-      if (length(cells_in_cluster) >= 4) { # this line ends the sub clustering # min of desired cluster size
-        correlation <- mean((corr_expr_raw[cells_in_cluster,cells_in_cluster])[lower.tri(corr_expr_raw[cells_in_cluster,cells_in_cluster], diag=F)])
+      if (length(cells_in_cluster) >= 4) { 
+        # this line ends the sub clustering # min of desired cluster size
         corr_expr_subset <- corr_expr[cells_in_cluster,cells_in_cluster]
         
         # main function

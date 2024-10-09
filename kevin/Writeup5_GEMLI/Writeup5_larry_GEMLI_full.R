@@ -43,10 +43,10 @@ GEMLI_items <- predict_lineages_custom(GEMLI_items,
                                        desired_cluster_size = c(50, 200),
                                        verbose = 1)
 
-# Error in hclust(as.dist(corr_expr_subset), method = "ward.D2", ) : 
-# NA/NaN/Inf in foreign function call (arg 10)
-# [[This is from quantify_clusters_iterative... https://github.com/UPSUTER/GEMLI/blob/main/GEMLI_package_v0/R/quantify_clusters_iterative.R#L19]]
+zz <- GEMLI_items[['prediction']] # we need to look at how they did it on LARRY...
+quantile(zz[zz!=0])
 
-
-
+GEMLI_items <- GEMLI::test_lineages(GEMLI_items, 
+                                    valid_fam_sizes = 50:200)
+GEMLI_items$testing_results
 
