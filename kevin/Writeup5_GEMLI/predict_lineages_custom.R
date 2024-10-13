@@ -2,7 +2,7 @@ predict_lineages_custom <- function(
     GEMLI_items, 
     bool_find_markers = TRUE,
     bool_set_seed = TRUE,
-    desired_cluster_size = c(0, 1e4), 
+    desired_cluster_size = c(50, 200), 
     fast = TRUE,
     repetitions = 100, 
     sample_size = (2/3), 

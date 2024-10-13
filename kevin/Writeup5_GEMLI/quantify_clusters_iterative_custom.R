@@ -1,5 +1,8 @@
 quantify_clusters_iterative_custom <- function(
-    data_matrix, marker_genes, N=2, fast=FALSE
+    data_matrix, 
+    marker_genes, 
+    N=2, 
+    fast=FALSE
 ){
   iterate <- TRUE
   i <- 2

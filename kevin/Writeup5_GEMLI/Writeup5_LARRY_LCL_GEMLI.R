@@ -20,25 +20,8 @@ keep_vec[seurat_obj$clone_id %in% largest_lineages] <- TRUE
 seurat_obj$keep <- keep_vec
 seurat_obj <- subset(seurat_obj, keep == TRUE)
 
-# remove any cells that are empty
-data_matrix <- SeuratObject::LayerData(seurat_obj,
-                                       layer = "data",
-                                       assay = "RNA")
-sum_vec <- Matrix::colSums(data_matrix)
-if(any(sum_vec == 0)){
-  keep_vec <- rep(TRUE, length(Seurat::Cells(seurat_obj)))
-  keep_vec[sum_vec == 0] <- FALSE
-  seurat_obj$keep <- keep_vec
-  seurat_obj <- subset(seurat_obj, keep == TRUE)
-}
-
 # run GEMLI
-data_matrix <- SeuratObject::LayerData(seurat_obj,
-                                       layer = "data",
-                                       assay = "RNA")
-data_matrix <- as.matrix(data_matrix)
-rowsum_vec <- Matrix::rowSums(data_matrix)
-data_matrix <- data_matrix[rowsum_vec != 0,]
+data_matrix <- t(seurat_obj[["LCL"]]@cell.embeddings)
 
 GEMLI_items <- list()
 GEMLI_items[['gene_expression']] <- data_matrix
@@ -46,22 +29,46 @@ GEMLI_items[['barcodes']] <- seurat_obj$clone_id
 
 set.seed(10)
 GEMLI_items <- predict_lineages_custom(GEMLI_items,
+                                       bool_find_markers = FALSE,
                                        desired_cluster_size = c(50,200),
                                        verbose = 1)
 
 save(date_of_run, session_info,
      GEMLI_items,
-     file = paste0(out_folder, "Writeup5_Larry_log_GEMLI.RData"))
+     file = paste0(out_folder, "Writeup5_Larry_LCL_GEMLI.RData"))
 
 zz <- GEMLI_items[['prediction']] # we need to look at how they did it on LARRY...
 quantile(zz[zz!=0])
 
-GEMLI_items <- GEMLI::test_lineages(GEMLI_items, 
-                                    valid_fam_sizes = 50:200)
+GEMLI_items <- test_lineages_custom(GEMLI_items, 
+                                    valid_fam_sizes = c(50,200))
 GEMLI_items$testing_results
 
 save(date_of_run, session_info,
      GEMLI_items,
-     file = paste0(out_folder, "Writeup5_Larry_log_GEMLI.RData"))
+     file = paste0(out_folder, "Writeup5_Larry_LCL_GEMLI.RData"))
 
 print("Done! :)")
+
+###############
+
+plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
+
+total_true <- GEMLI_items$testing_results["0","TP"]
+total_false <- GEMLI_items$testing_results["0","FP"]
+
+tpr <- GEMLI_items$testing_results[,"TP"]/total_true
+fpr <- GEMLI_items$testing_results[,"FP"]/total_false
+
+png(paste0(plot_folder, "Writeup5_LARRY_LCL_GEMLI_ROC.png"),
+    height = 1200, width = 1200, units = "px", res = 300)
+plot(x = fpr,
+     y = tpr,
+     xlim = c(0,1),
+     ylim = c(0,1),
+     xlab = "FPR",
+     ylab = "TPR",
+     pch = 16)
+lines(fpr, tpr)
+lines(c(0,1), c(0,1), col = 2, lwd = 2, lty = 2)
+graphics.off()
