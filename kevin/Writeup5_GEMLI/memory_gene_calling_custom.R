@@ -17,29 +17,35 @@ memory_gene_calling_custom <- function(GEMLI_items,
     }
   }
   
-  lineage_dict <- lineage_dict[names(lineage_dict)%in% match$cell.ID]
-  
+  if (verbose > 0) print("Compute value on observed data")
   lineage_center_variation <- .markers_by_cvsq_of_lineage_means(data_matrix, 
                                                                 lineage_dict = lineage_dict, 
                                                                 valid_lineage_sizes = valid_lineage_sizes, 
                                                                 use_median = use_median,
-                                                                verbose = verbose)
+                                                                verbose = verbose - 1)
   
   data_matrix_control <- matrix(NA, ncol=num_trials, nrow=nrow(data_matrix))
   rownames(data_matrix_control) <- rownames(data_matrix)
   
+  if (verbose > 0) print("Compute null distribution")
   for (i in c(1:num_trials)) {
-    if(verbose && num_trials > 10 && i %% floor(num_trials/10) == 0) cat('*')
+    if(verbose == 1 && num_trials > 10 && i %% floor(num_trials/10) == 0) cat('*')
+    if(verbose > 2) print(paste0("On trial", i))
     
     lineage_dict_sampled <- lineage_dict
     names(lineage_dict_sampled) <- sample(names(lineage_dict))
-    tmp <- markers_by_cvsq_of_lineage_means(as.matrix(data_matrix), 
-                                            lineage_dict = lineage_dict_sampled, 
-                                            valid_lineage_sizes = valid_lineage_sizes, 
-                                            use_median = use_median)
+    tmp <- .markers_by_cvsq_of_lineage_means(as.matrix(data_matrix), 
+                                             lineage_dict = lineage_dict_sampled, 
+                                             valid_lineage_sizes = valid_lineage_sizes, 
+                                             use_median = use_median,
+                                             verbose = verbose - 1)
     data_matrix_control[names(tmp),i] <- tmp
   }
-  markers_pvalue <- Matrix::rowSums(data_matrix_control[intersect(rownames(data_matrix_control), names(lineage_center_variation)),]>lineage_center_variation[intersect(rownames(data_matrix_control), names(lineage_center_variation))], na.rm=TRUE)/num_trials
+  
+  if (verbose > 0) print("Compute p-value")
+  df_1 <- data_matrix_control[intersect(rownames(data_matrix_control), names(lineage_center_variation)),,drop = FALSE]
+  df_2 <- lineage_center_variation[intersect(rownames(data_matrix_control), names(lineage_center_variation)),drop = FALSE]
+  markers_pvalue <- Matrix::rowSums(df_1 > df_2, na.rm=TRUE)/num_trials
   
   shared_genes <- intersect(names(lineage_center_variation), names(markers_pvalue))
   marker_table <- data.frame(cbind(lineage_center_variation[shared_genes], markers_pvalue[shared_genes]))
@@ -74,11 +80,12 @@ memory_gene_calling_custom <- function(GEMLI_items,
   
   if (verbose > 0) print("Compute lineage centers")
   for (lineage in as.character(unique(valid_lineage_dict))) {
+    tmp_mat <- data_matrix[,names(valid_lineage_dict)[valid_lineage_dict==lineage],drop = FALSE]
     if (use_median){
-      lineage_center[,lineage] <- apply(data_matrix[,names(valid_lineage_dict)[valid_lineage_dict==lineage]], 1, stats::median, na.rm = TRUE)
+      lineage_center[,lineage] <- apply(tmp_mat, 1, stats::median, na.rm = TRUE)
     }
     else {
-      lineage_center[,lineage] <- Matrix::rowMeans(data_matrix[,names(valid_lineage_dict)[valid_lineage_dict==lineage]])
+      lineage_center[,lineage] <- Matrix::rowMeans(tmp_mat)
     }
   }
   
@@ -93,5 +100,6 @@ memory_gene_calling_custom <- function(GEMLI_items,
   loess_means <- stats::loess(y ~ x, span = 0.75, control = stats::loess.control(surface="direct"))
   filter <- names(which(!filter))
   lineage_center_variation <- loess_means$residuals
+  
   return(sort(lineage_center_variation[filter], decreasing = TRUE))
 }
