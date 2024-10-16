@@ -37,8 +37,9 @@ predict_lineages_custom <- function(
     # the main workhorse
     cell_clusters <- quantify_clusters_iterative_custom(data_matrix, 
                                                         marker_genes = marker_genes_sample, 
-                                                        N = 2, 
+                                                        check_positive = bool_find_markers,
                                                         fast = fast,
+                                                        N = 2, 
                                                         verbose = verbose - 1)
     
     cell_clusters_unique_name <- cell_clusters

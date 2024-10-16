@@ -1,14 +1,18 @@
 quantify_clusters_iterative_custom <- function(
     data_matrix, 
     marker_genes, 
-    N=2, 
     fast=TRUE,
+    check_positive=TRUE,
     max_iterations=25,
+    N=2, 
     verbose=0
 ){
   iterate <- TRUE
   i <- 2
-  genes <- intersect(marker_genes, rownames(data_matrix)[rowMeans(data_matrix)>0])
+  genes <- marker_genes
+  if(check_positive){
+    genes <- intersect(marker_genes, rownames(data_matrix)[Matrix::rowMeans(data_matrix)>0])
+  }
   data_matrix <- data_matrix[genes,,drop = FALSE]
   
   # this probably can be changed to handle sparse matrices...
