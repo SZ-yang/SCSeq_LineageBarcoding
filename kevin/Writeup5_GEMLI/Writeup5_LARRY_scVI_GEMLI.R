@@ -2,6 +2,7 @@ rm(list=ls())
 
 library(Seurat)
 library(GEMLI)
+library(HiClimR) # or else GEMLI cannot find fastCor
 
 out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/"
 load(paste0(out_folder, "Larry_41093_2000_norm_log_cleaned.RData"))
