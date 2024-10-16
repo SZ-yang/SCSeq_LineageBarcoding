@@ -14,7 +14,13 @@ quantify_clusters_iterative_custom <- function(
   # this probably can be changed to handle sparse matrices...
   # https://github.com/UPSUTER/GEMLI/blob/main/GEMLI_package_v0/R/calculate_correlations.R
   # oh... for sure...
-  corr_expr_raw <- GEMLI:::calculate_correlations(t(data_matrix), fast=fast)
+  corr_expr_raw <- tryCatch(
+    {
+      GEMLI:::calculate_correlations(t(data_matrix), fast=fast)
+    }, error = function(cond){
+      GEMLI:::calculate_correlations(t(data_matrix), fast=FALSE)
+    }
+  )
   corr_expr <- (1 - corr_expr_raw)/2
   corr_expr[is.na(corr_expr)] <- 0
   
