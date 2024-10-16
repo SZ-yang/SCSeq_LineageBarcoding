@@ -9,7 +9,7 @@ quantify_clusters_iterative_custom <- function(
   iterate <- TRUE
   i <- 2
   genes <- intersect(marker_genes, rownames(data_matrix)[rowMeans(data_matrix)>0])
-  data_matrix <- data_matrix[genes,]
+  data_matrix <- data_matrix[genes,,drop = FALSE]
   
   # this probably can be changed to handle sparse matrices...
   # https://github.com/UPSUTER/GEMLI/blob/main/GEMLI_package_v0/R/calculate_correlations.R
