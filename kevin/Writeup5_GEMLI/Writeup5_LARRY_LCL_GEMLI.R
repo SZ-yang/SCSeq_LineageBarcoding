@@ -9,8 +9,10 @@ load(paste0(out_folder, "Larry_41093_2000_norm_log_cleaned.RData"))
 date_of_run <- Sys.time()
 session_info <- devtools::session_info()
 
-source("predict_lineages_custom.R")
-source("quantify_clusters_iterative_custom.R")
+code_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/"
+source(paste0(code_folder, "predict_lineages_custom.R"))
+source(paste0(code_folder, "quantify_clusters_iterative_custom.R"))
+source(paste0(code_folder, "test_lineages_custom.R"))
 
 # first filter to the top 50 lineages
 lineage_tab <- table(seurat_obj$clone_id)

@@ -9,8 +9,9 @@ load(paste0(out_folder, "Larry_41093_2000_norm_log_cleaned.RData"))
 date_of_run <- Sys.time()
 session_info <- devtools::session_info()
 
-source("predict_lineages_custom.R")
-source("quantify_clusters_iterative_custom.R")
+code_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/"
+source(paste0(code_folder, "predict_lineages_custom.R"))
+source(paste0(code_folder, "quantify_clusters_iterative_custom.R"))
 
 # first filter to the top 50 lineages
 lineage_tab <- table(seurat_obj$clone_id)
@@ -56,8 +57,8 @@ save(date_of_run, session_info,
 zz <- GEMLI_items[['prediction']] # we need to look at how they did it on LARRY...
 quantile(zz[zz!=0])
 
-GEMLI_items <- GEMLI::test_lineages(GEMLI_items, 
-                                    valid_fam_sizes = 50:200)
+GEMLI_items <- test_lineages_custom(GEMLI_items, 
+                                    valid_fam_sizes = c(50,200))
 GEMLI_items$testing_results
 
 save(date_of_run, session_info,
@@ -65,3 +66,26 @@ save(date_of_run, session_info,
      file = paste0(out_folder, "Writeup5_Larry_log_GEMLI.RData"))
 
 print("Done! :)")
+
+###############
+
+plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
+
+total_true <- GEMLI_items$testing_results["0","TP"]
+total_false <- GEMLI_items$testing_results["0","FP"]
+
+tpr <- GEMLI_items$testing_results[,"TP"]/total_true
+fpr <- GEMLI_items$testing_results[,"FP"]/total_false
+
+png(paste0(plot_folder, "Writeup5_LARRY_log_GEMLI_ROC.png"),
+    height = 1200, width = 1200, units = "px", res = 300)
+plot(x = fpr,
+     y = tpr,
+     xlim = c(0,1),
+     ylim = c(0,1),
+     xlab = "FPR",
+     ylab = "TPR",
+     pch = 16)
+lines(fpr, tpr)
+lines(c(0,1), c(0,1), col = 2, lwd = 2, lty = 2)
+graphics.off()
