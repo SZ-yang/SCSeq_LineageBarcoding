@@ -7,15 +7,14 @@ cs.logging.print_version()
 cs.settings.verbosity = 2
 cs.settings.data_path = "/home/users/kzlin/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup4/LARRY_data"  # A relative path to save data. If not existed before, create a new one.
 cs.settings.figure_path = "/home/users/kzlin/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup4/LARRY_figure"  # A relative path to save figures. If not existed before, create a new one.
-cs.settings.set_figure_params(
-    format="png", figsize=[4, 3.5], dpi=75, fontsize=14, pointsize=2
-)
 
 adata_orig = ad.read_h5ad("/home/users/kzlin/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/Larry_41093_2000_norm_log_cleaned.h5ad")
 print(adata_orig)
 
 # Convert the 'time_info' (or 'Time point') column to string type
-adata_orig.obs['Time point'] = adata_orig.obs['Time point'].astype(str)
+adata_orig.obs['time_info'] = adata_orig.obs['time_info'].astype(int).astype(str)
+
+cs.hf.check_available_choices(adata_orig)
 
 adata = cs.tmap.infer_Tmap_from_multitime_clones(
     adata_orig,
