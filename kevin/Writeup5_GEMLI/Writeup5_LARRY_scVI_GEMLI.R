@@ -36,12 +36,15 @@ GEMLI_items <- list()
 GEMLI_items[['gene_expression']] <- data_matrix
 GEMLI_items[['barcodes']] <- seurat_obj$clone_id
 
-
 set.seed(10)
 GEMLI_items <- predict_lineages_custom(GEMLI_items,
                                        bool_find_markers = FALSE,
                                        desired_cluster_size = c(50,200),
-                                       verbose = 1)
+                                       verbose = 4)
+
+save(date_of_run, session_info,
+     GEMLI_items,
+     file = paste0(out_folder, "Writeup5_Larry_scVI_GEMLI.RData"))
 
 GEMLI_items <- test_lineages_custom(GEMLI_items, 
                                     valid_fam_sizes = c(50,200))
@@ -49,4 +52,4 @@ GEMLI_items$testing_results
 
 save(date_of_run, session_info,
      GEMLI_items,
-     file = paste0(out_folder, "Writeup5_Larry_LCL_GEMLI.RData"))
+     file = paste0(out_folder, "Writeup5_Larry_scVI_GEMLI.RData"))
