@@ -2,7 +2,7 @@ quantify_clusters_iterative_custom <- function(
     data_matrix, 
     marker_genes, 
     N=2, 
-    fast=FALSE,
+    fast=TRUE,
     max_iterations=25,
     verbose=0
 ){
