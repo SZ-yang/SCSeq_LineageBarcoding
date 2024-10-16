@@ -14,10 +14,13 @@ cs.settings.set_figure_params(
 adata_orig = ad.read_h5ad("/home/users/kzlin/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/Larry_41093_2000_norm_log_cleaned.h5ad")
 print(adata_orig)
 
+# Convert the 'time_info' (or 'Time point') column to string type
+adata.obs['Time point'] = adata.obs['Time point'].astype(str)
+
 adata = cs.tmap.infer_Tmap_from_multitime_clones(
     adata_orig,
-    clonal_time_points=[2, 4, 6],
-    later_time_point=2,
+    clonal_time_points=["2", "4", "6"],
+    later_time_point="6",
     smooth_array=[20, 15, 10],
     sparsity_threshold=0.2,
     max_iter_N=3,
