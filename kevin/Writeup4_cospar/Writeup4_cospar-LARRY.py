@@ -15,7 +15,7 @@ adata_orig = ad.read_h5ad("/home/users/kzlin/kzlinlab/projects/scContrastiveLear
 print(adata_orig)
 
 # Convert the 'time_info' (or 'Time point') column to string type
-adata.obs['Time point'] = adata.obs['Time point'].astype(str)
+adata_orig.obs['Time point'] = adata_orig.obs['Time point'].astype(str)
 
 adata = cs.tmap.infer_Tmap_from_multitime_clones(
     adata_orig,
