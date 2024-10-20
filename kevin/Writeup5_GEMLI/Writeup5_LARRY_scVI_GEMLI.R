@@ -54,3 +54,27 @@ GEMLI_items$testing_results
 save(date_of_run, session_info,
      GEMLI_items,
      file = paste0(out_folder, "Writeup5_Larry_scVI_GEMLI.RData"))
+
+###############
+
+plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
+
+total_true <- GEMLI_items$testing_results["0","TP"]
+total_false <- GEMLI_items$testing_results["0","FP"]
+
+tpr <- GEMLI_items$testing_results[,"TP"]/total_true
+fpr <- GEMLI_items$testing_results[,"FP"]/total_false
+
+png(paste0(plot_folder, "Writeup5_LARRY_scVI_GEMLI_ROC.png"),
+    height = 1200, width = 1200, units = "px", res = 300)
+plot(x = fpr,
+     y = tpr,
+     xlim = c(0,1),
+     ylim = c(0,1),
+     xlab = "FPR",
+     ylab = "TPR",
+     pch = 16)
+lines(fpr, tpr)
+lines(c(0,1), c(0,1), col = 2, lwd = 2, lty = 2)
+graphics.off()
+
