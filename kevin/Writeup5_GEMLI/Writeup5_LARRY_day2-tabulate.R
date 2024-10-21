@@ -11,6 +11,7 @@ seurat_obj_day6 <- subset(seurat_obj, Time.point == 6)
 tab_mat <- table(seurat_obj_day6$clone_id, seurat_obj_day6$state_info)
 vec <- rowSums(tab_mat[,c("Baso", "Ccr7_DC", "Eos", "Erythroid", "Lymphoid", "Mast", "Meg", "pDC")])
 tab_mat <- cbind(tab_mat[,c("Monocyte", "Neutrophil", "Undifferentiated")], vec)
+colnames(tab_mat)[4] <- "Other"
 
 # monocyte_lineage is more than 80% monocyte
 # neutrophil_lineage is more than 80% neutrophil
@@ -43,5 +44,32 @@ out_folder2 <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup6/"
 write.csv(metadata_df,
           file = paste0(out_folder2, "LARRY_tabulate-lineages.csv"))
 
+#########################
 
+prop_mat <- tab_mat
+for(i in 1:nrow(prop_mat)){
+  prop_mat[i,] <- prop_mat[i,]/sum(prop_mat[i,])
+}
+colnames(prop_mat) <- paste0(colnames(prop_mat), "_proportion")
+
+sum_vec <- rowSums(tab_mat)
+entropy_vec <- sapply(1:nrow(tab_mat), function(i){
+  if(tab_mat[i,"Other"] > 1e-5) return(NA)
+  vec <- tab_mat[i,c("Monocyte", "Neutrophil", "Undifferentiated")]
+  vec2 <- vec[c("Monocyte", "Neutrophil")]
+  vec2 <- vec2+vec["Undifferentiated"]/2
+  vec2 <- vec2/sum(vec2)
+  vec2 <- vec2[vec2 > 1e-6]
+  -sum(vec2 * log2(vec2))
+})
+names(entropy_vec) <- rownames(tab_mat)
+  
+df <- cbind(tab_mat, prop_mat)
+df <- as.data.frame(df)
+df$lineage_size <- sum_vec
+df$entropy <- entropy_vec
+
+out_folder3 <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/csv/kevin/Writeup6/"
+write.csv(df,
+          file = paste0(out_folder3, "LARRY_lineage_day-6_statistics.csv"))
 
