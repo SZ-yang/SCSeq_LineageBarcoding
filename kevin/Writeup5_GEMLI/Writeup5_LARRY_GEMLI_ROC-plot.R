@@ -7,6 +7,9 @@ GEMLI_items_LCL <- GEMLI_items
 load(paste0(out_folder, "Writeup5_Larry_log_GEMLI.RData"))
 GEMLI_items_log <- GEMLI_items
 
+load(paste0(out_folder, "Writeup5_Larry_scVI_GEMLI.RData"))
+GEMLI_items_scVI <- GEMLI_items
+
 ###############
 
 .compute_tpr_fpr <- function(GEMLI_items){
@@ -28,12 +31,28 @@ tmp <- .compute_tpr_fpr(GEMLI_items_log)
 fpr_log <- tmp$fpr
 tpr_log <- tmp$tpr
 
+tmp <- .compute_tpr_fpr(GEMLI_items_scVI)
+fpr_scVI <- tmp$fpr
+tpr_scVI <- tmp$tpr
+
+############
+
+# Compute AUC using the trapezoidal rule
+.compute_auc <- function(fpr, tpr){
+  auc <- -(sum(diff(fpr) * (head(tpr, -1) + tail(tpr, -1)) / 2))
+  return(2*(auc-0.5))
+}
+
+LCL_auc <- .compute_auc(fpr_LCL, tpr_LCL)
+log_auc <- .compute_auc(fpr_log, tpr_log)
+scVI_auc <- .compute_auc(fpr_scVI, tpr_scVI)
+
 ############
 
 df <- data.frame(
-  tpr = c(tpr_LCL, tpr_log),
-  fpr = c(fpr_LCL, fpr_log),
-  model = rep(c("LCL", "log-normalized"),
+  tpr = c(tpr_LCL, tpr_log, tpr_scVI),
+  fpr = c(fpr_LCL, fpr_log, fpr_scVI),
+  model = rep(c("LCL", "log-normalized" , "scVI"),
               each = length(tpr_LCL))
 )
 
@@ -44,9 +63,13 @@ plot1 <- ggplot(df, aes(x = fpr, y = tpr, color = model)) +
   geom_line() +
   geom_abline(linetype = "dashed", color = "red") +  # Diagonal line (random classifier)
   labs(x = "False Positive Rate (FPR)", y = "True Positive Rate (TPR)", 
-       title = "ROC Curve Comparison") +
+       title = paste0("ROC Curve Comparison",
+                      "\nAUC: LCL: ", round(LCL_auc, 2), 
+                      ", log: ", round(log_auc, 2), 
+                      ", scVI: ", round(scVI_auc, 2))) +
   scale_color_manual(values = c(rgb(212, 63, 136, maxColorValue = 255), 
-                                rgb(117, 164, 58, maxColorValue = 255))) +  # Customize colors if you want
+                                rgb(117, 164, 58, maxColorValue = 255),
+                                rgb(221, 173, 59, maxColorValue = 255))) +  # Customize colors if you want
   coord_equal()
 
 plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"

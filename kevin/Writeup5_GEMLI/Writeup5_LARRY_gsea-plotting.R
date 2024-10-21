@@ -22,6 +22,7 @@ gse <- clusterProfiler::gseGO(
 )
 
 gse_df_LCL <- as.data.frame(gse)
+length(which(gse_df_LCL$p.adjust <= 0.05))
 
 ################
 
@@ -45,14 +46,83 @@ gse <- clusterProfiler::gseGO(
 
 gse_df_memory <- as.data.frame(gse)
 
+################
+
+df <- read.csv(paste0(csv_folder, "Writeup5_LARRY_scVI_hotspot_day2_autocorrelations.csv"))
+
+teststat_vec <- df[,"Z"]
+names(teststat_vec) <- df[,"Gene"]
+teststat_vec <- sort(teststat_vec, decreasing = TRUE)
+
+set.seed(10)
+gse <- clusterProfiler::gseGO(
+  teststat_vec,
+  ont = "BP", # what kind of pathways are you interested in
+  keyType = "SYMBOL",
+  OrgDb = "org.Mm.eg.db",
+  pvalueCutoff = 1,
+  minGSSize = 10,            # minimum gene set size
+  maxGSSize = 500            # maximum gene set size
+)
+
+gse_df_scVI <- as.data.frame(gse)
+length(which(gse_df_scVI$p.adjust <= 0.05))
+
+go_scVI <- gse_df_scVI[which(gse_df_scVI$p.adjust <= 0.05),"ID"]
+go_LCL <- gse_df_LCL[which(gse_df_LCL$p.adjust <= 0.05),"ID"]
+setdiff(go_LCL, go_scVI)
+gse_df_LCL[setdiff(go_LCL, go_scVI),1:2]
+gse_df_LCL["GO:0002520",]
+
+##################
+
+# now do cospar
+cospar_df <- read.csv("~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup4/Writeup4_cospar-LARRY_postprocess_adata-obs.csv")
+cospar_df <- cospar_df[cospar_df$time_info == 2,]
+quantile(cospar_df$fate_bias_transition_map_Neutrophil.Monocyte)
+
+tmp <- cospar_df[,c("Library", "Cell.barcode")]
+tmp$Cell.barcode <- gsub("-", "", tmp$Cell.barcode)
+cell_id <- apply(tmp, 1, function(x){paste0(x, collapse = ":")})
+fate_vec <- cospar_df$fate_bias_transition_map_Neutrophil.Monocyte
+names(fate_vec) <- cell_id
+
+out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/"
+load(paste0(out_folder, "Larry_41093_2000_norm_log_cleaned.RData"))
+mat <- SeuratObject::LayerData(
+  seurat_obj,
+  layer = "data",
+  assay = "RNA"
+)
+mat <- mat[,names(fate_vec)]
+teststat_vec <- apply(mat, 1, function(x){
+  stats::cor(fate_vec, x)
+})
+teststat_vec <- teststat_vec[!is.na(teststat_vec)]
+teststat_vec <- sort(teststat_vec, decreasing = TRUE)
+
+set.seed(10)
+gse <- clusterProfiler::gseGO(
+  teststat_vec,
+  ont = "BP", # what kind of pathways are you interested in
+  keyType = "SYMBOL",
+  OrgDb = "org.Mm.eg.db",
+  pvalueCutoff = 1,
+  minGSSize = 10,            # minimum gene set size
+  maxGSSize = 500            # maximum gene set size
+)
+
+gse_df_cospar <- as.data.frame(gse)
+length(which(gse_df_cospar$p.adjust <= 0.05))
+
 ##################
 
 gse_df_LCL[which(gse_df_LCL$p.adjust <= 0.05), "Description"]
 
 # find the GO terms
-go_terms <- c("immune system process",
-              "response to external stimulus",
-              "response to oxygen-containing compound")
+go_terms <- c("response to external stimulus",
+              "response to oxygen-containing compound",
+              "defense response to bacterium")
 go_id <- sapply(go_terms, function(x){
   gse_df_LCL[which(gse_df_LCL$Description == x),"ID"]
 })
@@ -60,15 +130,19 @@ go_full <- sapply(1:3, function(i){
   paste0(go_id[i], ": ", go_terms[i])
 })
 
-lcl_log10pvalue <- -log10(gse_df_LCL[go_id, "pvalue"])
+LCL_log10pvalue <- -log10(gse_df_LCL[go_id, "pvalue"])
+scVI_log10pvalue <- -log10(gse_df_scVI[go_id, "pvalue"])
 memory_log10pvalue <- -log10(gse_df_memory[go_id, "pvalue"])
-
+cospar_log10pvalue <- -log10(gse_df_cospar[go_id, "pvalue"])
 
 # Create a data frame in long format
 df <- data.frame(
-  pathway = rep(go_full, 2),
-  log10_p = c(lcl_log10pvalue, memory_log10pvalue),
-  method = rep(c("Hotspot on LCL", "GEMLI memory score"), each = 3)
+  pathway = rep(go_full, 4),
+  log10_p = c(LCL_log10pvalue, scVI_log10pvalue, memory_log10pvalue, cospar_log10pvalue),
+  method = rep(c("Hotspot on LCL",
+                 "Hotspot on scVI",
+                 "GEMLI memory score", 
+                 "CoSPAR"), each = 3)
 )
 
 library(ggplot2)
@@ -80,7 +154,9 @@ plot1 <- ggplot(df, aes(x = pathway, y = log10_p, fill = method)) +
   labs(x = "Pathways", y = "-log10(p-value)", 
        title = "-log10(p-value) of Gene Pathways for Two Methods") +
   scale_fill_manual(values = c(rgb(212, 63, 136, maxColorValue = 255), 
-                               rgb(117, 164, 58, maxColorValue = 255))) +  # Customize bar colors
+                               rgb(117, 164, 58, maxColorValue = 255),
+                               rgb(221, 173, 59, maxColorValue = 255),
+                               rgb(0, 123, 206, maxColorValue = 255))) +  # Customize bar colors
   theme_minimal() +
   theme(axis.title.y = element_blank())  # Remove the y-axis title (optional)
 
