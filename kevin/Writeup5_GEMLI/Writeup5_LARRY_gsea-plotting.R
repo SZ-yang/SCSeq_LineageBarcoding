@@ -2,6 +2,9 @@ rm(list=ls())
 
 library(org.Mm.eg.db)
 library(clusterProfiler)
+library(ggplot2)
+
+plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
 
 csv_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/csv/kevin/Writeup5/"
 df <- read.csv(paste0(csv_folder, "Writeup5_LARRY_LCL_hotspot_day2_autocorrelations.csv"))
@@ -23,6 +26,22 @@ gse <- clusterProfiler::gseGO(
 
 gse_df_LCL <- as.data.frame(gse)
 length(which(gse_df_LCL$p.adjust <= 0.05))
+
+gse_short <- clusterProfiler::gseGO(
+  teststat_vec,
+  ont = "BP", # what kind of pathways are you interested in
+  keyType = "SYMBOL",
+  OrgDb = "org.Mm.eg.db",
+  pvalueCutoff = 0.05,
+  minGSSize = 10,            # minimum gene set size
+  maxGSSize = 500            # maximum gene set size
+)
+
+plot1 <- enrichplot::dotplot(gse_short, showCategory=nrow(gse_short)) + ggplot2::ggtitle("GSEA on LCL's Hotspot statistic")
+plot1 <- plot1 + ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8))
+
+ggplot2::ggsave(filename = paste0(plot_folder, "Writeup5_LARRY_LCL-hotspot_dotplot.png"),
+                plot1, device = "png", width = 5, height = 5, units = "in")
 
 ################
 
@@ -120,9 +139,9 @@ length(which(gse_df_cospar$p.adjust <= 0.05))
 gse_df_LCL[which(gse_df_LCL$p.adjust <= 0.05), "Description"]
 
 # find the GO terms
-go_terms <- c("response to external stimulus",
-              "response to oxygen-containing compound",
-              "defense response to bacterium")
+go_terms <- c("response to oxygen-containing compound",
+              "defense response to bacterium",
+              "response to external stimulus")
 go_id <- sapply(go_terms, function(x){
   gse_df_LCL[which(gse_df_LCL$Description == x),"ID"]
 })
@@ -145,7 +164,11 @@ df <- data.frame(
                  "CoSPAR"), each = 3)
 )
 
-library(ggplot2)
+# Specify the order of the pathways (from top to bottom in the plot)
+df$pathway <- factor(df$pathway, levels = go_full)  
+
+# Specify the order of the methods (the order within each pathway)
+df$method <- factor(df$method, levels = c("GEMLI memory score", "CoSPAR", "Hotspot on scVI", "Hotspot on LCL"))
 
 # Plot the horizontal barplot
 plot1 <- ggplot(df, aes(x = pathway, y = log10_p, fill = method)) +
@@ -160,11 +183,34 @@ plot1 <- ggplot(df, aes(x = pathway, y = log10_p, fill = method)) +
   theme_minimal() +
   theme(axis.title.y = element_blank())  # Remove the y-axis title (optional)
 
-
-plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
 ggplot2::ggsave(plot1, 
                 filename = paste0(plot_folder, "Writeup5_LARRY_GSEA-barplots.png"),
                 height = 900, width = 3000, units = "px")
+
+####
+
+color_vec <-  c("Hotspot on LCL" = rgb(212, 63, 136, maxColorValue = 255),
+                "CoSPAR" = rgb(0, 123, 206, maxColorValue = 255), 
+                "GEMLI memory score" = rgb(117, 164, 58, maxColorValue = 255),
+                "Hotspot on scVI" = rgb(221, 173, 59, maxColorValue = 255))
+
+# Plot the horizontal barplot
+plot1 <- ggplot(df, aes(x = pathway, y = log10_p, fill = method)) +
+  geom_bar(stat = "identity", position = "dodge") +  # "dodge" to compare side-by-side bars
+  coord_flip() +  # Flip coordinates to make bars horizontal
+  labs(x = "", y = "", 
+       title = "") +
+  scale_fill_manual(values = color_vec) +  # Customize bar colors
+  theme_minimal() +
+  theme(axis.title.y = element_blank(),  # Remove the y-axis title
+        axis.text.y = element_blank(),   # Remove the y-axis text (pathway names)
+        axis.ticks.y = element_blank()) +   # Remove the y-axis ticks
+  Seurat::NoLegend()
+
+ggplot2::ggsave(plot1, 
+                filename = paste0(plot_folder, "Writeup5_LARRY_GSEA-barplots_cleaned.png"),
+                height = 900, width = 847, units = "px")
+
 
 
 

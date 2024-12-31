@@ -1,5 +1,7 @@
 rm(list=ls())
 
+plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
+
 out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/"
 load(paste0(out_folder, "Writeup5_Larry_LCL_GEMLI.RData"))
 GEMLI_items_LCL <- GEMLI_items
@@ -70,11 +72,28 @@ plot1 <- ggplot(df, aes(x = fpr, y = tpr, color = model)) +
   scale_color_manual(values = c(rgb(212, 63, 136, maxColorValue = 255), 
                                 rgb(117, 164, 58, maxColorValue = 255),
                                 rgb(221, 173, 59, maxColorValue = 255))) +  # Customize colors if you want
-  coord_equal()
+  coord_equal() 
 
-plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
 ggplot2::ggsave(plot1, 
                 filename = paste0(plot_folder, "Writeup5_LARRY_GEMLI_ROC.png"),
                 height = 1200, width = 1200, units = "px")
+
+
+###
+
+# Plot both ROC curves
+plot1 <- ggplot(df, aes(x = fpr, y = tpr, color = model)) +
+  geom_line(size = 1.5) +
+  geom_abline(linetype = "dashed", color = "red") +  # Diagonal line (random classifier)
+  labs(x = "", y = "", title = "") +
+  scale_color_manual(values = c(rgb(212, 63, 136, maxColorValue = 255), 
+                                rgb(117, 164, 58, maxColorValue = 255),
+                                rgb(221, 173, 59, maxColorValue = 255))) +  # Customize colors if you want
+  coord_equal() +
+  Seurat::NoLegend()
+
+ggplot2::ggsave(plot1, 
+                filename = paste0(plot_folder, "Writeup5_LARRY_GEMLI_ROC_cleaned.png"),
+                height = 900, width = 900, units = "px")
 
 
