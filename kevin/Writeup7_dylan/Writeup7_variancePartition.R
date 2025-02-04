@@ -20,7 +20,7 @@ scaled_data <- SeuratObject::LayerData(all_data,
 
 # subset for top variable genes
 var_data <- scaled_data
-var_info <- seurat_obj@meta.data
+var_info <- all_data@meta.data
 
 varPart <- variancePartition::fitExtractVarPartModel(var_data,
                                                      form,
