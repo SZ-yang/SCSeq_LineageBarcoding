@@ -97,3 +97,50 @@ ggplot2::ggsave(plot1, file = paste0(fig_folder, "Writeup7_umap_Lineage.png"),
 save(all_data,
      file = paste0(out_folder, "Writeup7_shaffer_preprocessed.RData"))
 
+####
+
+# export the count matrix
+
+library(Seurat)
+library(SeuratObject)
+library(Matrix)
+
+out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup7/"
+
+# 1. Read the obs (cell) and var (gene) names from Python
+obs_python <- read.csv(paste0(out_folder, "obs_names_python.csv"), header=FALSE, stringsAsFactors=FALSE)[,1]
+var_python <- read.csv(paste0(out_folder, "var_names_python.csv"), header=FALSE, stringsAsFactors=FALSE)[,1]
+
+# 2. Subset your Seurat object to match these cells and genes
+#    In Seurat, cells are columns and features (genes) are rows.
+#    Make sure you only keep the intersection to avoid missing data errors.
+common_cells <- intersect(Seurat::Cells(all_data), obs_python)
+common_genes <- intersect(SeuratObject::Features(all_data), var_python)
+
+# Subset the Seurat object to keep only the common cells and genes
+all_data_subset <- subset(all_data, cells = common_cells, features = common_genes)
+
+# 3. Extract the raw count matrix (layer = "counts") 
+#    If you only stored counts in the default assay slot, you could do GetAssayData(..., slot="counts").
+#    But since you specifically mention LayerData:
+zz <- SeuratObject::LayerData(all_data_subset,
+                              layer = "counts", 
+                              assay = "RNA",
+                              features = common_genes)
+
+# 4. Reorder rows and columns to match EXACTLY the Python var/cell order
+#    By default, LayerData might return features x cells. Check dimension names with rownames() / colnames().
+#    Confirm which dimension is genes vs cells, then reorder:
+
+# Genes in rows
+zz <- zz[match(var_python, rownames(zz)), ]   # Reorder rows to match var_python
+# Cells in columns
+zz <- zz[, match(obs_python, colnames(zz))]   # Reorder columns to match obs_python
+
+# 5. Finally, write out the matrix in .mtx format
+writeMM(zz, file = paste0(out_folder, "counts_matrix.mtx"))
+
+# Also optionally export row and column names if you want them in separate files:
+writeLines(rownames(zz), paste0(out_folder, "genes_ordered.txt"))
+writeLines(colnames(zz), paste0(out_folder, "cells_ordered.txt"))
+
