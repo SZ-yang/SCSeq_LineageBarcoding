@@ -5,6 +5,7 @@ library(ggplot2)
 library(ggrepel)
 
 out_folder <- "/Users/kevinlin/Library/CloudStorage/Dropbox/Collaboration-and-People/Joshua/out/kevin/Writeup7_joshua-results_dylan/"
+plot_folder <- "/Users/kevinlin/Library/CloudStorage/Dropbox/Collaboration-and-People/Joshua/git/SCSeq_LineageBarcoding/fig/kevin/Writeup7/"
 
 load(paste0(out_folder, "adata_with_lcl.RData"))
 
@@ -41,10 +42,13 @@ color_vec <- c("cis" = rgb(202,111,55, maxColorValue = 255),
                "dabtramtococl2" = rgb(145,54,147, maxColorValue = 255),
                "dabtramtodabtram" = rgb(68,32,85, maxColorValue = 255))
 
-scCustomize::DimPlot_scCustom(seurat_obj,
-                              reduction = "lcl.umap",
-                              group.by = "OG_condition",
-                              colors_use = color_vec)
+plot1 <- scCustomize::DimPlot_scCustom(seurat_obj,
+                                       reduction = "lcl.umap",
+                                       group.by = "OG_condition",
+                                       colors_use = color_vec)
+ggplot2::ggsave(plot1,
+                filename = paste0(plot_folder, "Writeup7_lcl-umap_OG_condition.png"),
+                height = 5, width = 8)
 
 ################
 
@@ -52,7 +56,9 @@ plot1 <- scCustomize::DimPlot_scCustom(seurat_obj,
                                        reduction = "lcl.umap",
                                        group.by = "RNA_snn_res.0.1")
 plot1 <- plot1 + Seurat::NoLegend()
-plot1
+ggplot2::ggsave(plot1,
+                filename = paste0(plot_folder, "Writeup7_lcl-umap_RNA_snn_res.0.1.png"),
+                height = 5, width = 5)
 
 #################
 
@@ -85,7 +91,9 @@ plot1 <- ggplot(df, aes(x = num_lineages, y = num_cells,label = cluster)) +
                   point.padding = 0.3) +  # Prevent label overlapping
   labs(x = "Number of Lineages", y = "Number of Cells", title = "Cluster Scatter Plot") +
   Seurat::NoLegend()
-plot1
+ggplot2::ggsave(plot1,
+                filename = paste0(plot_folder, "Writeup7_lineage-by-cells_per-lcl-cluster.png"),
+                height = 5, width = 5)
 
 ##################
 
