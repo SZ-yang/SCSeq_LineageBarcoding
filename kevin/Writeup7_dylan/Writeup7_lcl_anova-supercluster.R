@@ -84,7 +84,7 @@ seurat_obj$RNA_snn_res.0.01 <- factor(paste0("Cluster:", seurat_obj$RNA_snn_res.
 
 scCustomize::DimPlot_scCustom(seurat_obj,
                               group.by = "Lineage",
-                              reduction = "lcl.umap")
+                              reduction = "lcl.umap") + Seurat::NoLegend()
 
 ###########################
 
@@ -187,7 +187,8 @@ scCustomize::FeaturePlot_scCustom(seurat_obj,
 ##########
 
 # it really comes down to Cluster 0...
-tab_mat <- table(seurat_obj$Lineage, seurat_obj$RNA_snn_res.0.01)
+tab_mat <- table(seurat_obj$Lineage, 
+                 seurat_obj$RNA_snn_res.0.01)
 
 # number of lineages per cluster
 num_lineage_per_cluster <- apply(tab_mat, 2, function(x){length(which(x!=0))})
@@ -200,3 +201,38 @@ idx <- which(seurat_obj$Lineage %in% lineage_names)
 tab_mat2 <- table(droplevels(seurat_obj$Lineage[idx]),
                   droplevels(seurat_obj$OG_condition[idx]))
 tab_mat2
+
+##############
+
+# among the remaining lineages, see if any are similar
+tab_mat <- table(droplevels(seurat_obj$Lineage), 
+                 droplevels(seurat_obj$OG_condition))
+rowsum_vec <- rowSums(tab_mat)
+tab_mat2 <- tab_mat
+# normalize
+for(i in 1:nrow(tab_mat2)){
+  tab_mat2[i,] <- tab_mat2[i,]/sum(tab_mat2[i,])
+}
+n <- nrow(tab_mat2)
+cor_mat <- stats::cor(t(tab_mat2))
+diag(cor_mat) <- NA
+hist(as.numeric(cor_mat))
+
+idx <- which(cor_mat > 0.9, arr.ind = TRUE)
+unique_lineage_idx <- unique(as.numeric(idx))
+largest_lineage_idx <- unique_lineage_idx[which.max(rowsum_vec[unique_lineage_idx])]
+rowsum_vec[largest_lineage_idx]
+
+# zoom in on this lineage
+partner_lineage_idx <- which(cor_mat[largest_lineage_idx,] >= 0.9)
+rowsum_vec[partner_lineage_idx]
+
+lineage_idx <- c(largest_lineage_idx, partner_lineage_idx)
+cor_mat[lineage_idx, lineage_idx]
+tab_mat[lineage_idx,]
+tab_mat2[lineage_idx,]
+
+lineage_names <- rownames(cor_mat)[lineage_idx]
+cell_idx <- which(seurat_obj$Lineage %in% lineage_names)
+tab_mat <- table(droplevels(seurat_obj$Lineage[cell_idx]),
+                 droplevels(seurat_obj$RNA_snn_res.0.01[cell_idx]))

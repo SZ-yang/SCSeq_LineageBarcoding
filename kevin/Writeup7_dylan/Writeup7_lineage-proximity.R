@@ -48,10 +48,10 @@ largest_lineage_idx <- unique_lineage_idx[which.max(rowsum_vec[unique_lineage_id
 rowsum_vec[largest_lineage_idx]
 
 # zoom in on this lineage
-parter_lineage_idx <- which(cor_mat[largest_lineage_idx,] >= 0.9)
-rowsum_vec[parter_lineage_idx]
+partner_lineage_idx <- which(cor_mat[largest_lineage_idx,] >= 0.9)
+rowsum_vec[partner_lineage_idx]
 
-lineage_idx <- c(largest_lineage_idx, parter_lineage_idx)
+lineage_idx <- c(largest_lineage_idx, partner_lineage_idx)
 cor_mat[lineage_idx, lineage_idx]
 tab_mat[lineage_idx,]
 tab_mat2[lineage_idx,]
