@@ -9,6 +9,10 @@ plot_folder <- "/Users/kevinlin/Library/CloudStorage/Dropbox/Collaboration-and-P
 
 load(paste0(out_folder, "adata_with_lcl.RData"))
 
+# number of lineages in each treatment
+tab_mat <- table(seurat_obj$Lineage, seurat_obj$OG_condition)
+apply(tab_mat, 2, function(x){length(which(x!=0))})
+
 ############
 
 plot1 <- scCustomize::DimPlot_scCustom(seurat_obj,

@@ -8,6 +8,7 @@ session_info <- devtools::session_info()
 
 source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/quantify_clusters_iterative_custom.R")
 source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/predict_lineages_custom.R")
+source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/test_lineages_custom.R")
 
 out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup7/"
 plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup7/"
