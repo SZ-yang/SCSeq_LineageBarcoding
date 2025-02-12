@@ -3,6 +3,9 @@ rm(list=ls())
 library(Seurat)
 library(GEMLI)
 
+date_of_run <- Sys.time()
+session_info <- devtools::session_info()
+
 source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/quantify_clusters_iterative_custom.R")
 source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/predict_lineages_custom.R")
 
