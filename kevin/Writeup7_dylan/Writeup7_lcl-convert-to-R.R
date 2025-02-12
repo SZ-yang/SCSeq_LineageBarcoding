@@ -96,6 +96,99 @@ seurat_obj$RNA_snn_res.0.01 <- factor(paste0("Cluster:", seurat_obj$RNA_snn_res.
 
 ###############
 
+# learn the fine-cluster
+embedding <- seurat_obj[["lcl"]]@cell.embeddings
+
+set.seed(10)
+knn_res <- RANN::nn2(data = embedding, 
+                     query = embedding,
+                     k = 10)
+nn_mat <- knn_res$nn.idx
+nn_mat <- nn_mat[,-1]
+i_vec <- as.numeric(t(nn_mat))
+j_vec <- rep(1:nrow(nn_mat), each = ncol(nn_mat))
+sparse_mat <- Matrix::sparseMatrix(i = i_vec, 
+                                   j = j_vec, 
+                                   x = rep(1, length(i_vec)),
+                                   dims = c(nrow(embedding), nrow(embedding)))
+sparse_mat <- sparse_mat * Matrix::t(sparse_mat)
+
+
+# Function to find connected components in a large sparse adjacency matrix
+find_connected_components_rows <- function(sparse_mat_r) {
+  n <- nrow(sparse_mat_r)
+  visited <- rep(FALSE, n)
+  component_labels <- integer(n)  # or rep(0, n)
+  component_id <- 0
+  
+  for (row_i in seq_len(n)) {
+    if(row_i %% floor(n/10) == 0) cat('*')
+    
+    if (!visited[row_i]) {
+      component_id <- component_id + 1
+      # Start BFS at row_i
+      queue <- row_i
+      
+      visited[row_i] <- TRUE
+      component_labels[row_i] <- component_id
+      
+      while (length(queue) > 0) {
+        current <- queue[1]
+        queue   <- queue[-1]
+        
+        # In row-compressed format, neighbors of 'current' row
+        start_idx <- sparse_mat_r@p[current]
+        end_idx   <- sparse_mat_r@p[current + 1] - 1
+        
+        # If start_idx <= end_idx, it means we have neighbors
+        if (start_idx <= end_idx) {
+          # @j holds the column indices of nonzeros in row `current`
+          neighbors <- sparse_mat_r@j[(start_idx + 1):(end_idx + 1)] + 1
+          for (nb in neighbors) {
+            if (!visited[nb]) {
+              visited[nb] <- TRUE
+              component_labels[nb] <- component_id
+              queue <- c(queue, nb)
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return(component_labels)
+}
+
+
+# Example usage
+set.seed(42)
+sparse_mat <- as(sparse_mat, "RsparseMatrix")
+components <- find_connected_components_rows(sparse_mat)
+
+# merge all the lineages
+iter <- 1
+components_updated <- components
+while(any(components_updated != components) | iter == 1){
+  print(iter)
+  components <- components_updated
+  
+  lineage_vec <- seurat_obj$Lineage
+  lineage_names <- unique(lineage_vec)
+  for(lineage in lineage_names){
+    idx <- which(lineage_vec == lineage)
+    min_val <- min(components_updated[idx])
+    components_updated[idx] <- min_val
+  }
+  
+  iter <- iter+1
+}
+components <- components_updated
+
+seurat_obj$fine_cluster <- factor(components)
+seurat_obj$fine_cluster <- factor(paste0("Fine:", seurat_obj$fine_cluster))
+
+###############
+
 seurat_obj <- Seurat::RunUMAP(seurat_obj, 
                               reduction = 'lcl', 
                               dims = 1:64, 
