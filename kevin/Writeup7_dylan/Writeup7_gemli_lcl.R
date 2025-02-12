@@ -1,7 +1,6 @@
 rm(list=ls())
 
 library(Seurat)
-library(GEMLI)
 
 source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/quantify_clusters_iterative_custom.R")
 source("~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/predict_lineages_custom.R")
