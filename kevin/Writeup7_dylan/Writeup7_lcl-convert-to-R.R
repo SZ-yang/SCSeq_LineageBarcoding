@@ -184,8 +184,9 @@ while(any(components_updated != components) | iter == 1){
 }
 components <- components_updated
 
-seurat_obj$fine_cluster <- factor(components)
-seurat_obj$fine_cluster <- factor(paste0("Fine:", seurat_obj$fine_cluster))
+# Relabel clusters to be consecutive integers starting from 0
+components <- as.integer(factor(components))   # Convert to factor, then to integer, then shift to start at 0
+seurat_obj$fine_cluster <- factor(paste0("LCL:", components))
 
 ###############
 
