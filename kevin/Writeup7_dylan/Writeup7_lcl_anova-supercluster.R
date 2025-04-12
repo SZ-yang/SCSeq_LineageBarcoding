@@ -196,6 +196,11 @@ gse <- clusterProfiler::gseGO(
 
 gse_df <- as.data.frame(gse)
 
+plot1 <-dotplot(gse, showCategory=30) + ggtitle("dotplot for GSEA")
+ggplot2::ggsave(plot1,
+                filename = paste0(plot_folder, "Writeup7_lcl_anova-supercluster_gsea.png"),
+                height = 5, width = 5)
+
 gse_df[ c("Description","p.adjust")]
 
 actin_genes <- gse_df["GO:0051015", "core_enrichment"]
