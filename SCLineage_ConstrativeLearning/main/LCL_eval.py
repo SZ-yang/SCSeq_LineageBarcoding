@@ -7,7 +7,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 
 class Eval:
-    def __init__(self, embedding, anndata, num_top_clone_ids=5, custom_palette=None):
+    def __init__(self, embedding, anndata, clone_id = "clone_id",  num_top_clone_ids=5, custom_palette=None):
         """
         Initialize UMAPAnalyzer with embedding and anndata.
         
@@ -23,10 +23,11 @@ class Eval:
         """
         self.embedding = embedding
         self.anndata = anndata
+        self.clone_id = clone_id
         self.num_top_clone_ids = num_top_clone_ids
         self.custom_palette = custom_palette or ['#D1392C', '#4A7CB3', '#67AD57', '#8E529F', '#EE8632']
-        self.labels = anndata.obs["clone_id"].to_numpy()
-        self.clone_id_counts = anndata.obs['clone_id'].value_counts()
+        self.labels = anndata.obs[self.clone_id].to_numpy()
+        self.clone_id_counts = anndata.obs[self.clone_id].value_counts()
         self.top_clone_ids = self.clone_id_counts.index[:num_top_clone_ids]
         self.knn_train_model = None
         self.knn_test_model = None
@@ -108,7 +109,7 @@ class Eval:
         """
         Train a KNN classifier on the full training set and evaluate on the test set.
         """
-        test_labels = anndata_test.obs["clone_id"].to_numpy()
+        test_labels = anndata_test.obs[self.clone_id].to_numpy()
         self.knn_test_model = KNeighborsClassifier(n_neighbors=n_neighbors)
         self.knn_test_model.fit(self.embedding, self.labels)
         
