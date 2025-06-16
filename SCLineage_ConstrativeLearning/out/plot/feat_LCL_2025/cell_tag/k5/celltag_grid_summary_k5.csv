@@ -1,0 +1,5 @@
+lambda,unlabeled_per_batch,batch_size,train_overall_acc,train_overall_unique,test_overall_acc,test_containment,test_overall_rank,test_overall_unique,test_q0,test_q25,test_q50,test_q75,test_q100
+0.01,5,50,1,1,0.583,0.605,1.092,1.175,1,1,1,1.013,2
+0.1,5,50,0.906,1.432,0.328,0.437,1.872,2.067,1,1.119,1.646,2.022,5
+0.5,5,50,0.749,2.253,0.306,0.487,2.132,2.691,1,1.458,1.875,2.906,5
+1,5,50,0.649,2.747,0.281,0.463,2.007,3.073,1,1.275,1.9,2.75,4
