@@ -12,10 +12,10 @@ from typing import Tuple, List, Dict
 class LCL_Eval:
     """
     Given a concatenated AnnData (train+test with embedding in .obsm["LCL_embedding"]), this class provides:
-      1) compute_adjusted_knn_stats(...) → returns train/test KNN accuracy + rank‐based + unique‐label stats
-      2) plot_top_clones_umap(...)     → UMAP highlighting top‐N clones (train vs test)
-      3) plot_test_accuracy_umap(...)  → UMAP where all train are gray, and test cells = green/red by correctness
-      4) run_all(...)                  → convenience wrapper to run all three at once
+      1) evaluate_adjusted_knn(...) → returns train/test KNN accuracy, rank‐based stats (conditional on containment) + containment rate
+      2) plot_top_clones_umap(...)   → UMAP highlighting top‐N clones (train vs test)
+      3) plot_test_accuracy_umap(...)→ UMAP: train=gray, test correct=green (on top), test incorrect=red
+      4) run_all(...)                → convenience wrapper to run all three at once
     """
 
     def __init__(
@@ -37,7 +37,7 @@ class LCL_Eval:
 
         sns.set_style("whitegrid")
 
-        # verify high-D embedding
+        # 1) verify high-D embedding
         if self.embedding_key not in self.adata.obsm:
             raise KeyError(f"Could not find embedding under adata.obsm['{self.embedding_key}'].")
 
@@ -45,19 +45,17 @@ class LCL_Eval:
         if hd.ndim != 2 or hd.shape[1] < 3:
             raise ValueError(f"adata.obsm['{self.embedding_key}'] must be shape [n_cells, D] with D≥3.")
 
-        # compute 2D UMAP
+        # 2) compute 2D UMAP
         reducer = umap.UMAP(**self.umap_kwargs)
-        umap2d = reducer.fit_transform(hd)
-        self.adata.obsm["UMAP_embedding"] = umap2d
+        self.adata.obsm["UMAP_embedding"] = reducer.fit_transform(hd)
 
-        # top-N clones
+        # 3) find top-N clones
         counts = self.adata.obs[self.clone_key].value_counts()
         self.top_clones = counts.index[:self.num_top].tolist()
 
-        # clone_group column
+        # 4) build clone_group column
         def _group_fn(x):
             return x if x in self.top_clones else "Other"
-
         self.adata.obs["clone_group"] = (
             self.adata.obs[self.clone_key]
             .apply(_group_fn)
@@ -71,7 +69,7 @@ class LCL_Eval:
                 .reorder_categories(cats, ordered=True)
         )
 
-        # color map
+        # 5) build color map
         if palette is None:
             base_pal = sns.color_palette("tab10", n_colors=self.num_top)
             self.color_map = {self.top_clones[i]: base_pal[i] for i in range(self.num_top)}
@@ -79,11 +77,10 @@ class LCL_Eval:
             if len(palette) < self.num_top:
                 raise ValueError(f"Palette length {len(palette)} < num_top={self.num_top}")
             self.color_map = {self.top_clones[i]: palette[i] for i in range(self.num_top)}
-
         self.color_map["Other"] = "lightgray"
 
 
-    # ─── KNN & rank/unique evaluation ───────────────────────────
+    # ─── KNN & rank/containment evaluation ───────────────────────────
 
     @staticmethod
     def compute_global_freq(labels: np.ndarray) -> Dict[int, float]:
@@ -101,52 +98,56 @@ class LCL_Eval:
         global_freq: Dict[int, float],
         k: int
     ) -> Tuple[
-         np.ndarray, List[int], float, float, List[int], List[int]
+         np.ndarray, List[float], List[float], List[int], List[int], List[int]
     ]:
         """
-        Returns preds, ranks, avg_rank, avg_unique_lbl, correct_flags, unique_label_counts.
-        ⚠️ If true_label not among neighbors, rank = k+1
+        Returns:
+          preds              : np.ndarray, length = n_points
+          ranks              : List[float], rank of true label if contained, else np.nan
+          containment_flags  : List[int], 1 if true_label in k‐NN else 0
+          correct_flags      : List[int], 1 if predicted==true_label else 0
+          unique_counts      : List[int], # distinct train‐labels in each k‐NN
         """
         neigh = knn_model.kneighbors(embeddings, return_distance=False)
         n = embeddings.shape[0]
 
         preds = np.zeros(n, dtype=train_labels.dtype)
         ranks = []
-        unique_label_counts = []
-        correct_flags = []
+        containment = []
+        correct = []
+        unique_counts = []
 
         for i, nbrs in enumerate(neigh):
             nbr_lab = train_labels[nbrs]
             uq, ct = np.unique(nbr_lab, return_counts=True)
-            num_unique = len(uq)
-            unique_label_counts.append(num_unique)
+            unique_counts.append(len(uq))
 
             # local freq
             local_freq = {lab: c/k for lab, c in zip(uq, ct)}
 
             # adjusted scores
-            scores = {lab: local_freq.get(lab,0)-global_freq.get(lab,0)
-                      for lab in global_freq.keys()}
-
+            scores = {
+                lab: local_freq.get(lab,0) - global_freq.get(lab,0)
+                for lab in global_freq.keys()
+            }
             best = max(scores.items(), key=lambda x: x[1])[0]
             preds[i] = best
 
-            # rank of true
+            # containment & rank
             sorted_lbl = sorted(local_freq.items(), key=lambda x: x[1], reverse=True)
             ranked = [lab for lab,_ in sorted_lbl]
             t = labels_true[i]
             if t in ranked:
-                rpos = ranked.index(t)+1
+                containment.append(1)
+                ranks.append(ranked.index(t) + 1)
             else:
-                rpos = k+1    # ⚠️ k+1 instead of num_unique+1
-            ranks.append(rpos)
+                containment.append(0)
+                ranks.append(np.nan)
 
-            correct_flags.append(1 if best==t else 0)
+            # correctness
+            correct.append(1 if best==t else 0)
 
-        avg_rank = float(np.mean(ranks))
-        avg_unique = float(np.mean(unique_label_counts))
-
-        return preds, ranks, avg_rank, avg_unique, correct_flags, unique_label_counts
+        return preds, ranks, containment, correct, unique_counts
 
 
     def evaluate_adjusted_knn(
@@ -157,79 +158,77 @@ class LCL_Eval:
         test_labels: np.ndarray,
         k: int = 30
     ) -> Dict[str, Dict]:
-        global_freq = self.compute_global_freq(train_labels)
+        """
+        Fit adjusted‐KNN on train, then evaluate:
 
-        knn = KNeighborsClassifier(n_neighbors=k)
-        knn.fit(train_embeddings, train_labels)
+        Returns dict:
+        {
+          "train": { "accuracy",  "avg_unique", },  # same as before
+          "test":  {
+              "accuracy",          # adjusted‐knn accuracy
+              "containment_rate",  # P(true lineage in k‐NN)
+              "overall_avg_rank",  # avg rank conditional on containment
+              "avg_unique",        # unchanged
+              "rank_quantiles"     # includes q0,q25,q50,q75,q100
+          }
+        }
+        """
+        gf = self.compute_global_freq(train_labels)
+        knn = KNeighborsClassifier(n_neighbors=k).fit(train_embeddings, train_labels)
 
-        # train side
-        ( _,
-          train_ranks,
-          _train_avg_rank_layer1,
-          _train_avg_unique_layer1,
-          train_flags,
-          train_uniq_counts
-        ) = self.adjusted_knn_predict_with_rank(
-                knn, train_labels, train_embeddings, train_labels, global_freq, k
+        # train‐side (we keep same as before)
+        _, train_ranks, train_cont, train_corr, train_uniq = (
+            self.adjusted_knn_predict_with_rank(
+                knn, train_labels, train_embeddings, train_labels, gf, k
             )
+        )
+        train_accuracy = np.mean(train_corr)
+        train_avg_unique = float(np.mean(train_uniq))
 
-        # test side
-        ( _,
-          test_ranks,
-          _test_avg_rank_layer1,
-          _test_avg_unique_layer1,
-          test_flags,
-          test_uniq_counts
-        ) = self.adjusted_knn_predict_with_rank(
-                knn, train_labels, test_embeddings, test_labels, global_freq, k
+        # test‐side
+        _, test_ranks, test_cont, test_corr, test_uniq = (
+            self.adjusted_knn_predict_with_rank(
+                knn, train_labels, test_embeddings, test_labels, gf, k
             )
-
-        # two-layer aggregate function
-        def layer2_aggregate(labels, flags, ranks, uniqs):
-            per_acc, per_rank, per_uniq = {}, {}, {}
-            ulabels = np.unique(labels)
-            for lab in ulabels:
-                idx = np.where(labels==lab)[0]
-                per_acc[lab]  = float(np.mean([flags[i] for i in idx]))
-                per_rank[lab] = float(np.mean([ranks[i] for i in idx]))
-                per_uniq[lab] = float(np.mean([uniqs[i] for i in idx]))
-            overall_acc  = float(np.mean(list(per_acc.values())))
-            overall_rank = float(np.mean(list(per_rank.values())))
-            overall_uniq = float(np.mean(list(per_uniq.values())))
-            lineage_ranks = [per_rank[lab] for lab in sorted(ulabels)]
-            return per_acc, per_rank, per_uniq, overall_acc, overall_rank, overall_uniq, lineage_ranks
-
-        # aggregate
-        (train_pa, train_pr, train_pu,
-         train_oa, train_or, train_ou, train_lr) = layer2_aggregate(
-            train_labels, train_flags, train_ranks, train_uniq_counts
         )
-        (test_pa, test_pr, test_pu,
-         test_oa, test_or, test_ou, test_lr) = layer2_aggregate(
-            test_labels, test_flags, test_ranks, test_uniq_counts
-        )
+        test_accuracy      = float(np.mean(test_corr))
+        containment_rate   = float(np.mean(test_cont))
+        avg_unique_test    = float(np.mean(test_uniq))
 
-        # quantiles
-        def qtls(arr):
-            arr = np.array(arr)
+        # condition on containment
+        mask = np.array(test_cont, dtype=bool)
+        ranks_c  = [r for r,m in zip(test_ranks, mask) if m]
+        # two‐layer per‐lineage avg rank:
+        # group by lineage, average ranks only over contained cells
+        per_rank, _ = {}, {}
+        for lab in np.unique(test_labels[mask]):
+            idxs = np.where((test_labels==lab)&mask)[0]
+            per_rank[lab] = float(np.nanmean([test_ranks[i] for i in idxs]))
+        overall_avg_rank = float(np.mean(list(per_rank.values())))
+
+        # quantiles over per‐lineage average ranks
+        arr = np.array(list(per_rank.values()))
+        def qdict(a):
             return {
-              "q25": round(float(np.quantile(arr,0.25)),3),
-              "q50": round(float(np.quantile(arr,0.50)),3),
-              "q75": round(float(np.quantile(arr,0.75)),3)
+              "q0":  round(float(np.quantile(a,0.0)),3),
+              "q25": round(float(np.quantile(a,0.25)),3),
+              "q50": round(float(np.quantile(a,0.50)),3),
+              "q75": round(float(np.quantile(a,0.75)),3),
+              "q100":round(float(np.quantile(a,1.0)),3)
             }
+        rank_quantiles = qdict(arr)
 
         return {
           "train": {
-            "overall_accuracy":  round(train_oa,3),
-            "overall_avg_rank":  round(train_or,3),
-            "overall_avg_unique":round(train_ou,3),
-            "rank_quantiles":    qtls(train_lr)
+            "accuracy":    round(train_accuracy,3),
+            "avg_unique":  round(train_avg_unique,3)
           },
           "test": {
-            "overall_accuracy":  round(test_oa,3),
-            "overall_avg_rank":  round(test_or,3),
-            "overall_avg_unique":round(test_ou,3),
-            "rank_quantiles":    qtls(test_lr)
+            "accuracy":          round(test_accuracy,3),
+            "containment_rate":  round(containment_rate,3),
+            "overall_avg_rank":  round(overall_avg_rank,3),
+            "avg_unique":        round(avg_unique_test,3),
+            "rank_quantiles":    rank_quantiles
           }
         }
 
@@ -242,30 +241,32 @@ class LCL_Eval:
         title=None,
         savepath: str = None
     ):
-        df = self.adata.obs
-        coords = self.adata.obsm["UMAP_embedding"]
-        is_tr = (df[self.dataset_key]=="train")
-        is_te = (df[self.dataset_key]=="test")
+        df    = self.adata.obs
+        coords= self.adata.obsm["UMAP_embedding"]
+        is_tr = df[self.dataset_key]=="train"
+        is_te = df[self.dataset_key]=="test"
 
         fig,ax = plt.subplots(figsize=figsize,dpi=200)
-
-        # Other first
-        m1 = (df["clone_group"]=="Other") & is_tr
-        m2 = (df["clone_group"]=="Other") & is_te
-
-        ax.scatter(coords[m1,0],coords[m1,1],c=self.color_map["Other"],
-                   s=8,marker=".",alpha=0.2,label="Train Other")
-        ax.scatter(coords[m2,0],coords[m2,1],c=self.color_map["Other"],
-                   s=12,marker="x",alpha=0.2,label="Test Other")
+        # Others
+        for side,mk,sz,lab in [
+            ("train", ".", 8,  "Train Other"),
+            ("test",  "x",12,  "Test Other")
+        ]:
+            mask = (df["clone_group"]=="Other") & (is_tr if side=="train" else is_te)
+            ax.scatter(coords[mask,0],coords[mask,1],
+                       c=self.color_map["Other"],marker=mk,
+                       s=sz,alpha=0.2,label=lab)
 
         # top clones
         for c in self.top_clones:
-            mt = (df["clone_group"]==c)&is_tr
-            mx = (df["clone_group"]==c)&is_te
-            ax.scatter(coords[mt,0],coords[mt,1],c=self.color_map[c],
-                       s=30,marker=".",alpha=0.8,label=f"Train {c}")
-            ax.scatter(coords[mx,0],coords[mx,1],c=self.color_map[c],
-                       s=40,marker="x",alpha=0.9,label=f"Test {c}")
+            for side,mk,sz,alpha,lab in [
+                ("train",".",30,0.8,f"Train {c}"),
+                ("test","x",40,0.9,f"Test {c}")
+            ]:
+                mask = (df["clone_group"]==c) & (is_tr if side=="train" else is_te)
+                ax.scatter(coords[mask,0],coords[mask,1],
+                           c=self.color_map[c],marker=mk,
+                           s=sz,alpha=alpha,label=lab)
 
         ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2")
         ax.set_title(title or f"UMAP – Top {self.num_top} Clones")
@@ -278,8 +279,7 @@ class LCL_Eval:
 
         plt.tight_layout()
         if savepath:
-            if not savepath.lower().endswith(".png"):
-                savepath = os.path.splitext(savepath)[0]+".png"
+            savepath = os.path.splitext(savepath)[0] + ".png"
             fig.savefig(savepath,format="png",dpi=300,bbox_inches="tight")
         return fig,ax
 
@@ -295,43 +295,40 @@ class LCL_Eval:
         title=None,
         savepath: str = None
     ):
-        # get per-cell correctness
+        # get per-cell correctness & containment
         gf = self.compute_global_freq(train_labels)
-        knn = KNeighborsClassifier(n_neighbors=k).fit(train_embeddings, train_labels)
-        _,_,_,_, flags, _ = self.adjusted_knn_predict_with_rank(
+        knn= KNeighborsClassifier(n_neighbors=k).fit(train_embeddings, train_labels)
+        _, _, cont, corr, _ = self.adjusted_knn_predict_with_rank(
             knn, train_labels, test_embeddings, test_labels, gf, k
         )
-        flags = np.array(flags)
+        cont = np.array(cont); corr = np.array(corr)
 
-        df = self.adata.obs.copy()
-        coords = self.adata.obsm["UMAP_embedding"]
-        is_tr = (df[self.dataset_key]=="train")
-        is_te = (df[self.dataset_key]=="test")
-
+        df    = self.adata.obs.copy()
+        coords= self.adata.obsm["UMAP_embedding"]
+        is_tr = df[self.dataset_key]=="train"
+        is_te = df[self.dataset_key]=="test"
         status = np.zeros(len(df),dtype=int)
         status[is_tr] = 0
+
+        # fill test: 1=correct & contained, 2=incorrect or not contained
         ti = np.where(is_te)[0]
-        for idx,fl in zip(ti, flags):
-            status[idx] = 1 if fl==1 else 2
+        for idx, (cflag, flag) in enumerate(zip(cont, corr)):
+            status[ti[idx]] = 1 if (cflag==1 and flag==1) else 2
 
-        cmap = {0:"lightgray",1:"green",2:"red"}
-        smap = {0:12,1:30,2:30}
-        mmap = {0:".",1:"x",2:"x"}
-        amap = {0:0.2,1:0.9,2:0.9}
-
+        # draw
         fig,ax = plt.subplots(figsize=figsize,dpi=200)
-        # draw train+incorrect first
-        for sv in [0,2]:
-            m = (status==sv)
-            ax.scatter(coords[m,0],coords[m,1],
-                       c=cmap[sv],s=smap[sv],
-                       marker=mmap[sv],alpha=amap[sv],
-                       label=("Train" if sv==0 else "Test Incorrect"))
+        for sv,clr,mk,sz,alp,lab in [
+            (0,"lightgray",".",12,0.2,"Train"),
+            (2,"red",      "x",30,0.9,"Test Incorrect"),
+        ]:
+            mask = status==sv
+            ax.scatter(coords[mask,0],coords[mask,1],
+                       c=clr,marker=mk,s=sz,alpha=alp,label=lab)
+
         # correct on top
-        m = (status==1)
-        ax.scatter(coords[m,0],coords[m,1],
-                   c=cmap[1],s=smap[1],
-                   marker=mmap[1],alpha=amap[1],
+        mask = status==1
+        ax.scatter(coords[mask,0],coords[mask,1],
+                   c="green",marker="x",s=30,alpha=0.9,
                    label="Test Correct")
 
         ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2")
@@ -345,8 +342,7 @@ class LCL_Eval:
 
         plt.tight_layout()
         if savepath:
-            if not savepath.lower().endswith(".png"):
-                savepath = os.path.splitext(savepath)[0]+".png"
+            savepath = os.path.splitext(savepath)[0] + ".png"
             fig.savefig(savepath,format="png",dpi=300,bbox_inches="tight")
         return fig,ax
 
