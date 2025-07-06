@@ -1,5 +1,5 @@
-lambda,unlabeled_per_batch,batch_size,train_overall_acc,train_overall_unique,test_overall_acc,test_containment,test_overall_rank,test_overall_unique,test_q0,test_q25,test_q50,test_q75,test_q100
-0.01,5,50,0.919,1.328,0.596,0.627,1.22,1.593,1,1,1,1.131,3
-0.1,5,50,0.821,2.302,0.346,0.512,3.598,4.25,1,1.292,2.219,4,12
-0.5,5,50,0.655,4.985,0.328,0.602,2.929,5.365,1,2,3,3.8,6
-1,5,50,0.548,6.567,0.309,0.637,4.002,7.036,1,2.434,3.483,5.292,10
+lambda,unlabeled_per_batch,batch_size,train_overall_acc,train_overall_unique,test_overall_acc,test_containment,test_overall_rank,test_overall_unique,test_unique_q0,test_unique_q25,test_unique_q50,test_unique_q75,test_unique_q100,test_accuracy_q0,test_accuracy_q25,test_accuracy_q50,test_accuracy_q75,test_accuracy_q100
+0.01,5,50,0.919,1.328,0.596,0.627,1.22,1.593,1,1,1,1.131,3,0,0,0,0.667,1
+0.1,5,50,0.821,2.302,0.346,0.512,3.598,4.25,1,1.292,2.219,4,12,0,0,0,0,0.878
+0.5,5,50,0.655,4.985,0.328,0.602,2.929,5.365,1,2,3,3.8,6,0,0,0,0,0.946
+1,5,50,0.548,6.567,0.309,0.637,4.002,7.036,1,2.434,3.483,5.292,10,0,0,0,0,0.811

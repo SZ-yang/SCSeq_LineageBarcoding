@@ -3,13 +3,15 @@ rm(list=ls())
 library(Seurat)
 library(GEMLI)
 
-out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/"
+out_folder <- "/Users/apple/Desktop/KB/data/feat_LCL_2025/GEMLI_custom/"
 load(paste0(out_folder, "Larry_41093_2000_norm_log_cleaned.RData"))
+#load(paste0(out_folder, "Writeup5_Larry_LCL_GEMLI.RData"))
+
 
 date_of_run <- Sys.time()
 session_info <- devtools::session_info()
 
-code_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/"
+code_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding2/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/out/plot/feat_LCL_2025/GEMLI_custom/"
 source(paste0(code_folder, "predict_lineages_custom.R"))
 source(paste0(code_folder, "quantify_clusters_iterative_custom.R"))
 source(paste0(code_folder, "test_lineages_custom.R"))
@@ -53,7 +55,7 @@ save(date_of_run, session_info,
 print("Done! :)")
 
 ###############
-plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
+plot_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding2/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/out/plot/feat_LCL_2025/GEMLI_custom/"
 
 res <- GEMLI_items$testing_results
 
