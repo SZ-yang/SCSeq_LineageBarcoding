@@ -37,6 +37,7 @@ def get_args():
     parser.add_argument('--max_epoch', type=int, default=220, help='Maximum number of epochs')
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save outputs')
     parser.add_argument('--train_test', default=0, type=int, help='1: split the data for train and validation; 0: otherwise')
+    #parser.add_argument('--input_dim', default=2000, type=int, help='the input dimension of count matrix (number of genes)')
     parser.add_argument('--hidden_dims', default=[1024, 256, 64], type=lambda s: [int(item) for item in s.split(',')], help='dimensions of each layer of base encoder. example input: 1024,256,64')
     parser.add_argument('--embedding_size', default=32, type=int, help='the output dimension of projection head')
     parser.add_argument('--resume_from_checkpoint', type=str, help='Path to a checkpoint to resume from', default=None)
@@ -192,8 +193,6 @@ class SaveCheckpointCallback(Callback):
 class Hparams:
     def __init__(self, args):
         self.input_dim = 2000  # number of genes
-        # self.hidden_dims = [1024, 256, 64]
-        # self.embedding_size = 32  # size of the output embeddings
         self.hidden_dims = args.hidden_dims
         self.embedding_size = args.embedding_size # size of the output embeddings
         
@@ -295,6 +294,13 @@ def save_model_and_losses(trainer, loss_callback, config):
 def main():
     args = get_args()
     train_config = Hparams(args)
+    
+    # first, infer the true input_dim from the AnnData on disk:
+    adata0 = ad.read_h5ad(train_config.file_path)
+    real_dim = adata0.n_vars   # same as adata0.shape[1]
+    print(f"Detected input feature‐dim = {real_dim}; overriding config.input_dim")
+    train_config.input_dim = real_dim
+
     # Ensure directory exists
     if not os.path.exists(train_config.save):
         os.makedirs(train_config.save)
@@ -308,11 +314,16 @@ def main():
     print("temperature: " , train_config.temperature)
     print("number of epochs: ", train_config.epochs)
     print("train_test_ratio: ", train_config.train_test_ratio)
-    print("input_dim: ", train_config.input_dim)
+    print("input_dim (inferred): ", train_config.input_dim)
     print("hidden_dims: ", train_config.hidden_dims)
     print("embedding_size: ", train_config.embedding_size)
 
     model = scContraLearn(train_config)
+
+    w0 = model.model.base_encoder[0].weight
+    print("first‐layer weight shape:", tuple(w0.shape), f"(should be ({train_config.hidden_dims[0]},{train_config.input_dim}))")
+
+
     data_loaders = prepare_data_loaders(train_config)
 
     # call back
@@ -374,7 +385,7 @@ def main():
     except AttributeError:    
         count_matrix_arr = count_matrix
 
-    count_matrix_th = torch.from_numpy(count_matrix_arr)
+    count_matrix_th = torch.from_numpy(count_matrix_arr).float()
     dataset_cell = TensorDataset(count_matrix_th)
     data_loader_all = torch.utils.data.DataLoader(dataset_cell, batch_size=train_config.batch_size, shuffle=False, num_workers=1,drop_last=False)
     print("num of batches for all cells (not cell pairs):", len(data_loader_all))
