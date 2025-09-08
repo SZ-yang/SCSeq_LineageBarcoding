@@ -163,10 +163,23 @@ class LossCallback(Callback):
         self.val_losses = []
         self.avg_val_losses = []
 
+        # NEW: store parts
+        self.train_contrast = []
+        self.train_penalty  = []
+        self.val_contrast   = []
+
     def on_train_epoch_end(self, trainer, pl_module, unused=None):
-        train_loss = trainer.callback_metrics.get('train_loss')
-        if train_loss is not None:
-            self.train_losses.append(train_loss.item())
+
+        cm = trainer.callback_metrics
+        # main train loss
+        if 'train_loss' in cm and cm['train_loss'] is not None:
+            self.train_losses.append(cm['train_loss'].item())
+        # NEW: parts
+        if 'contrast_loss' in cm and cm['contrast_loss'] is not None:
+            self.train_contrast.append(cm['contrast_loss'].item())
+        if 'entropy_penalty' in cm and cm['entropy_penalty'] is not None:
+            self.train_penalty.append(cm['entropy_penalty'].item())
+
 
     def on_validation_epoch_end(self, trainer, pl_module):
         val_loss = trainer.callback_metrics.get('val_loss')
@@ -280,6 +293,7 @@ def save_model_and_losses(trainer, loss_callback, config):
     # Save training losses
     np.save(os.path.join(config.out_dir, f'train_losses_bs{config.batch_size}_tau{config.temperature}.npy'),
             np.array(loss_callback.train_losses))
+    
 
     if config.train_test:
         # Save validation losses if train_test is True
@@ -287,6 +301,11 @@ def save_model_and_losses(trainer, loss_callback, config):
                 np.array(loss_callback.val_losses))
         np.save(os.path.join(config.out_dir, f'avg_val_losses_bs{config.batch_size}_tau{config.temperature}.npy'),
                 np.array(loss_callback.avg_val_losses))
+
+    np.save(os.path.join(config.out_dir, f'train_contrast_bs{config.batch_size}_tau{config.temperature}.npy'),
+            np.array(loss_callback.train_contrast))
+    np.save(os.path.join(config.out_dir, f'train_penalty_bs{config.batch_size}_tau{config.temperature}.npy'),
+            np.array(loss_callback.train_penalty))
 
 def main():
     args = get_args()
