@@ -1,0 +1,5 @@
+lambda,unlabeled_per_batch,batch_size,train_overall_acc,train_overall_unique,test_overall_acc,test_containment,test_overall_rank,test_overall_unique,test_unique_q0,test_unique_q25,test_unique_q50,test_unique_q75,test_unique_q100,test_accuracy_q0,test_accuracy_q25,test_accuracy_q50,test_accuracy_q75,test_accuracy_q100
+0.01,5,50,0.886,1.556,0.599,0.635,1.431,1.832,1,1,1,1.518,4,0,0,0,0.667,1
+0.1,5,50,0.772,2.716,0.357,0.532,5.225,5.315,1,1.571,2.964,6.75,18,0,0,0,0,0.924
+0.5,5,50,0.611,6.213,0.328,0.635,3.895,6.521,1,2,3.5,5,12,0,0,0,0,0.946
+1,5,50,0.512,8.351,0.318,0.68,4.95,8.878,1,2.778,4,6,13,0,0,0,0,0.757

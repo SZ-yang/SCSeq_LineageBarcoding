@@ -1,0 +1,5 @@
+lambda,total_clusters,clusters_both,clusters_train_only,clusters_test_only,total_lineages,lineages_one_cluster,pct_one_cluster
+0.01,147,40,105,2,169,85,50.3
+0.1,133,25,106,2,169,82,48.52
+0.5,61,38,23,0,169,62,36.69
+1.0,53,39,14,0,169,62,36.69
