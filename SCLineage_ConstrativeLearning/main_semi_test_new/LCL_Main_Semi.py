@@ -120,9 +120,9 @@ class scContraLearn(pl.LightningModule):
         loss = self.loss_fn(z1, z2, z_unl)
 
         # logging
-        self.log('train_loss',     loss,                       on_step=True, on_epoch=True, prog_bar=True)
-        self.log('contrast_loss',  self.loss_fn.last_contrastive, on_epoch=True)
-        self.log('entropy_penalty', self.loss_fn.last_penalty,     on_epoch=True)
+        self.log('train_loss',     loss,  on_step=True, on_epoch=True, prog_bar=True)
+        self.log('train_contrast', self.loss_fn.last_contrastive, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log('train_penalty', self.loss_fn.last_penalty, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -168,17 +168,22 @@ class LossCallback(Callback):
         self.train_penalty  = []
         self.val_contrast   = []
 
+
     def on_train_epoch_end(self, trainer, pl_module, unused=None):
+        print("DEBUG keys:", list(trainer.callback_metrics.keys()))
 
         cm = trainer.callback_metrics
-        # main train loss
-        if 'train_loss' in cm and cm['train_loss'] is not None:
+        
+        if 'train_loss' in cm:
             self.train_losses.append(cm['train_loss'].item())
-        # NEW: parts
-        if 'contrast_loss' in cm and cm['contrast_loss'] is not None:
-            self.train_contrast.append(cm['contrast_loss'].item())
-        if 'entropy_penalty' in cm and cm['entropy_penalty'] is not None:
-            self.train_penalty.append(cm['entropy_penalty'].item())
+            
+        if 'train_contrast' in cm:
+            self.train_contrast.append(cm['train_contrast'].item())
+        
+        if 'train_penalty' in cm:
+            self.train_penalty.append(cm['train_penalty'].item())
+
+
 
 
     def on_validation_epoch_end(self, trainer, pl_module):
