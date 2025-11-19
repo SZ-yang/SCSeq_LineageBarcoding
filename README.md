@@ -1,5 +1,5 @@
 # Deep-learning embedding for static lineage barcoded single-cell RNA-seq data
-Under the supervision of Prof. Kevin Lin at UW
+Under the supervision of Prof. Kevin Lin at the University of Washington
 
 ## Some Statistics of the Dataset
 
