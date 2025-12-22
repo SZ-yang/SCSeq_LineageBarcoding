@@ -35,6 +35,7 @@ def get_args():
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save outputs')
     parser.add_argument('--train_test', default=0, type=int, help='1: split the data for train and validation; 0: otherwise')
     parser.add_argument('--hidden_dims', default=[1024, 256, 64], type=lambda s: [int(item) for item in s.split(',')], help='dimensions of each layer of base encoder. example input: 1024,256,64')
+    parser.add_argument('--input_dim', default=2000, type=int, help='the output dimension of projection head')
     parser.add_argument('--embedding_size', default=32, type=int, help='the output dimension of projection head')
     parser.add_argument('--resume_from_checkpoint', type=str, help='Path to a checkpoint to resume from', default=None)
     return parser.parse_args()
@@ -135,7 +136,7 @@ class SaveCheckpointCallback(Callback):
 # Configuration class
 class Hparams:
     def __init__(self, args):
-        self.input_dim = 2000  # number of genes
+        self.input_dim = args.input_dim  # number of genes
         # self.hidden_dims = [1024, 256, 64]
         # self.embedding_size = 32  # size of the output embeddings
         self.hidden_dims = args.hidden_dims
