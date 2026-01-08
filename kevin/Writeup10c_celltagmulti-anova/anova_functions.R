@@ -1,4 +1,6 @@
 .anova_percentage <- function(x, y){
+  stopifnot(!any(is.na(y)))
+  
   y <- as.numeric(y)
   total_std <- sum((y - mean(y))^2)
   
