@@ -19,6 +19,10 @@ keep_vec <- seurat_obj$assigned_lineage %in% lineage_names
 seurat_obj$keep <- keep_vec
 seurat_obj <- subset(seurat_obj, keep == TRUE)
 
+keep_vec <- seurat_obj$Cell.type.annotation %in% c("Undifferentiated", "Neutrophil", "Monocyte")
+seurat_obj$keep <- keep_vec
+seurat_obj <- subset(seurat_obj, keep == TRUE)
+
 # for any lineage x cell-type with less than 5 cells, remove those cells
 tab_mat <- table(seurat_obj$assigned_lineage, seurat_obj$Cell.type.annotation)
 
@@ -31,7 +35,6 @@ combo_tab <- table(combo_key)
 
 keep_step1 <- combo_tab[combo_key] >= 5
 cells_step1 <- rownames(md)[keep_step1]
-
 seurat_obj <- subset(seurat_obj, cells = cells_step1)
 
 # ============================================================
@@ -46,7 +49,7 @@ n_types_per_lineage <- tapply(
   function(x) length(unique(x[!is.na(x)]))
 )
 
-keep_lineages <- names(n_types_per_lineage)[n_types_per_lineage > 1]
+keep_lineages <- names(n_types_per_lineage)[n_types_per_lineage > 2]
 cells_step2 <- rownames(md1)[md1$assigned_lineage %in% keep_lineages]
 
 seurat_obj <- subset(seurat_obj, cells = cells_step2)
@@ -109,19 +112,25 @@ var_mat <- sweep(
 # tiny negative numerical noise -> clamp to 0
 var_mat[var_mat <= 0 & var_mat > -1e-12] <- 1e-6
 
+idx <- which(sapply(1:nrow(mean_mat), function(j){
+  min(mean_mat[j,]) >= 1e-6
+}))
+mean_mat <- mean_mat[idx,]
+var_mat <- var_mat[idx,]
+
 ########################
 
 set.seed(1)
 
-# df already built from colnames(var_mat) / colnames(mean_mat)
-# df$lineage, df$celltype correspond to columns of mean_mat/var_mat
+df <- data.frame(
+  combo = colnames(var_mat)
+)
+df$lineage <- factor(sapply(colnames(var_mat), function(x){strsplit(x, split = "\\|\\|")[[1]][1]}))
+df$celltype <- factor(sapply(colnames(var_mat), function(x){strsplit(x, split = "\\|\\|")[[1]][2]}))
 
 # Pre-split column indices by lineage (so we can grab all lineage-celltype combos quickly)
 cols_by_lineage <- split(seq_len(ncol(mean_mat)), df$lineage)
 lineage_names   <- names(cols_by_lineage)
-
-n_sublineage <- 8   # sample 8 lineages
-n_rep        <- 10  # repeat 10 times
 
 # helper: fast W2 distance matrix for 1D Gaussians
 W2_dist_mat <- function(mu, var) {
@@ -138,37 +147,20 @@ for (gene_idx in seq_len(nrow(mean_mat))) {
   
   # ----- Celltype R2 (unchanged; computed on ALL lineage-celltype combos) -----
   D_all <- W2_dist_mat(mean_mat[gene_idx, ], var_mat[gene_idx, ])
-  res <- manova_var_explained(D = D_all, group = droplevels(df$celltype))
+  res1 <- manova_var_explained(D = D_all, group = droplevels(df$celltype))
+  res2 <- manova_var_explained(D = D_all, group = droplevels(df$lineage))
   
-  gene_R2[gene_idx, "Celltype"] <- res$R2
-  gene_R2[gene_idx, "SST"] <- res$SST
-  
-  # ----- Lineage R2 (subsample 8 lineages, do 10x, average) -----
-  r2_rep <- numeric(n_rep)
-  
-  for (b in seq_len(n_rep)) {
-    sampled_lineages <- sample(lineage_names, size = n_sublineage, replace = FALSE)
-    
-    # keep only the lineage-celltype columns belonging to these sampled lineages
-    cols_sub <- unlist(cols_by_lineage[sampled_lineages], use.names = FALSE)
-    
-    D_sub <- W2_dist_mat(mean_mat[gene_idx, cols_sub], var_mat[gene_idx, cols_sub])
-    
-    r2_rep[b] <- manova_var_explained(
-      D = D_sub,
-      group = droplevels(df$lineage[cols_sub])   # IMPORTANT: drop unused levels
-    )$R2
-  }
-  
-  gene_R2[gene_idx, "Lineage"] <- mean(r2_rep, na.rm = TRUE)
+  gene_R2[gene_idx, "Celltype"] <- res1$R2
+  gene_R2[gene_idx, "SST"] <- res1$SST
+  gene_R2[gene_idx, "Lineage"] <- res2$R2
 }
 
 # drop any NaNs if they appear
 gene_R2 <- gene_R2[is.finite(gene_R2[, "Lineage"]) & is.finite(gene_R2[, "Celltype"]), , drop = FALSE]
 
 gene_R2 <- gene_R2[order(gene_R2[,"SST"], decreasing = TRUE),]
-head(gene_R2)
 
 gene_R2_subset <- gene_R2[1:50,]
+head(gene_R2_subset)
 quantile(gene_R2_subset[,"Lineage"]/(gene_R2_subset[,"Lineage"] + gene_R2_subset[,"Celltype"]))
 
