@@ -111,37 +111,100 @@ var_mat[var_mat <= 0 & var_mat > -1e-12] <- 1e-6
 
 ########################
 
-df <- data.frame(
-  combo = colnames(var_mat)
-)
-df$lineage <- factor(sapply(colnames(var_mat), function(x){strsplit(x, split = "\\|\\|")[[1]][1]}))
-df$celltype <- factor(sapply(colnames(var_mat), function(x){strsplit(x, split = "\\|\\|")[[1]][2]}))
+set.seed(1)
 
-# For one gene:
-gene_R2 <- matrix(NA, nrow = nrow(expr), ncol = 2)
-rownames(gene_R2) <- rownames(expr)
-colnames(gene_R2) <- c("Lineage", "Celltype")
-for(gene_idx in 1:nrow(expr)){
-  if(gene_idx %% floor(nrow(expr)/10) == 0) cat('*')
-  
-  Was2_dist <- matrix(0, nrow = nrow(df), ncol = nrow(df))
-  for(i in 1:(nrow(df)-1)){
-    for(j in (i+1):nrow(df)){
-      Was2_dist[i,j] <- W2_gauss_1d(mu1 = mean_mat[gene_idx,i], 
-                                    var1 = var_mat[gene_idx,i], 
-                                    mu2 = mean_mat[gene_idx,j],  
-                                    var2 = var_mat[gene_idx,j])
-      Was2_dist[j,i] <- Was2_dist[i,j]
-    }
-  }
-  
-  res1 <- manova_var_explained(D = Was2_dist, 
-                               group = df$lineage)
-  res2 <- manova_var_explained(D = Was2_dist, 
-                               group = df$celltype)
-  
-  gene_R2[gene_idx,"Lineage"] <- res1$R2
-  gene_R2[gene_idx,"Celltype"] <- res2$R2
+# df already built from colnames(var_mat) / colnames(mean_mat)
+# df$lineage, df$celltype correspond to columns of mean_mat/var_mat
+
+# Pre-split column indices by lineage (so we can grab all lineage-celltype combos quickly)
+cols_by_lineage <- split(seq_len(ncol(mean_mat)), df$lineage)
+lineage_names   <- names(cols_by_lineage)
+
+n_sublineage <- 8   # sample 8 lineages
+n_rep        <- 10  # repeat 10 times
+
+# helper: fast W2 distance matrix for 1D Gaussians
+W2_dist_mat <- function(mu, var) {
+  s <- sqrt(var)
+  sqrt(outer(mu, mu, "-")^2 + outer(s, s, "-")^2)
 }
 
-gene_R2 <- gene_R2[!is.nan(gene_R2[,1]),]
+gene_R2 <- matrix(NA_real_, nrow = nrow(mean_mat), ncol = 2)
+rownames(gene_R2) <- rownames(mean_mat)
+colnames(gene_R2) <- c("Lineage", "Celltype")
+
+for (gene_idx in seq_len(nrow(mean_mat))) {
+  if (gene_idx %% floor(nrow(mean_mat)/10) == 0) cat("*")
+  
+  # ----- Celltype R2 (unchanged; computed on ALL lineage-celltype combos) -----
+  D_all <- W2_dist_mat(mean_mat[gene_idx, ], var_mat[gene_idx, ])
+  gene_R2[gene_idx, "Celltype"] <-
+    manova_var_explained(D = D_all, group = droplevels(df$celltype))$R2
+  
+  # ----- Lineage R2 (subsample 8 lineages, do 10x, average) -----
+  r2_rep <- numeric(n_rep)
+  
+  for (b in seq_len(n_rep)) {
+    sampled_lineages <- sample(lineage_names, size = n_sublineage, replace = FALSE)
+    
+    # keep only the lineage-celltype columns belonging to these sampled lineages
+    cols_sub <- unlist(cols_by_lineage[sampled_lineages], use.names = FALSE)
+    
+    D_sub <- W2_dist_mat(mean_mat[gene_idx, cols_sub], var_mat[gene_idx, cols_sub])
+    
+    r2_rep[b] <- manova_var_explained(
+      D = D_sub,
+      group = droplevels(df$lineage[cols_sub])   # IMPORTANT: drop unused levels
+    )$R2
+  }
+  
+  gene_R2[gene_idx, "Lineage"] <- mean(r2_rep, na.rm = TRUE)
+}
+
+# drop any NaNs if they appear
+gene_R2 <- gene_R2[is.finite(gene_R2[, "Lineage"]) & is.finite(gene_R2[, "Celltype"]), , drop = FALSE]
+
+head(gene_R2)
+
+####################################
+######### # Now, focus on marker genes
+Idents(seurat_obj) <- "Cell.type.annotation"
+
+# (optional but common) use the normalized/log data
+Seurat::DefaultAssay(seurat_obj) <- "RNA"
+
+# Helper: run FindMarkers and return top N genes (by avg_log2FC, with p adj tie-break)
+top_markers_one_vs_rest <- function(obj, ident, n = 50,
+                                    min.pct = 0.1, logfc.threshold = 0.25,
+                                    test.use = "wilcox", only.pos = TRUE) {
+  res <- Seurat::FindMarkers(
+    object = obj,
+    ident.1 = ident,
+    ident.2 = NULL,          # one vs all other identities
+    only.pos = only.pos,
+    test.use = test.use,
+    min.pct = min.pct,
+    logfc.threshold = logfc.threshold
+  )
+  
+  # avg_log2FC is Seurat v4/v5; older versions use avg_logFC
+  fc_col <- if ("avg_log2FC" %in% colnames(res)) "avg_log2FC" else "avg_logFC"
+  
+  res$gene <- rownames(res)
+  res <- res[order(-res[[fc_col]], res$p_val_adj, res$p_val), , drop = FALSE]
+  
+  head(res$gene, n)
+}
+
+celltypes <- c("Monocyte", "Neutrophil", "Undifferentiated")
+
+top50_list <- setNames(
+  lapply(celltypes, function(ct) top_markers_one_vs_rest(seurat_obj, ct, n = 50)),
+  celltypes
+)
+
+# union of all selected markers
+marker_genes_union <- sort(unique(unlist(top50_list)))
+
+gene_R2[marker_genes_union,]
+summary(gene_R2[marker_genes_union,])
