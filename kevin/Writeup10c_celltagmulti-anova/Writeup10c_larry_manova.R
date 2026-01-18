@@ -129,17 +129,19 @@ W2_dist_mat <- function(mu, var) {
   sqrt(outer(mu, mu, "-")^2 + outer(s, s, "-")^2)
 }
 
-gene_R2 <- matrix(NA_real_, nrow = nrow(mean_mat), ncol = 2)
+gene_R2 <- matrix(NA_real_, nrow = nrow(mean_mat), ncol = 3)
 rownames(gene_R2) <- rownames(mean_mat)
-colnames(gene_R2) <- c("Lineage", "Celltype")
+colnames(gene_R2) <- c("Lineage", "Celltype", "SST")
 
 for (gene_idx in seq_len(nrow(mean_mat))) {
   if (gene_idx %% floor(nrow(mean_mat)/10) == 0) cat("*")
   
   # ----- Celltype R2 (unchanged; computed on ALL lineage-celltype combos) -----
   D_all <- W2_dist_mat(mean_mat[gene_idx, ], var_mat[gene_idx, ])
-  gene_R2[gene_idx, "Celltype"] <-
-    manova_var_explained(D = D_all, group = droplevels(df$celltype))$R2
+  res <- manova_var_explained(D = D_all, group = droplevels(df$celltype))
+  
+  gene_R2[gene_idx, "Celltype"] <- res$R2
+  gene_R2[gene_idx, "SST"] <- res$SST
   
   # ----- Lineage R2 (subsample 8 lineages, do 10x, average) -----
   r2_rep <- numeric(n_rep)
@@ -164,47 +166,9 @@ for (gene_idx in seq_len(nrow(mean_mat))) {
 # drop any NaNs if they appear
 gene_R2 <- gene_R2[is.finite(gene_R2[, "Lineage"]) & is.finite(gene_R2[, "Celltype"]), , drop = FALSE]
 
+gene_R2 <- gene_R2[order(gene_R2[,"SST"], decreasing = TRUE),]
 head(gene_R2)
 
-####################################
-######### # Now, focus on marker genes
-Idents(seurat_obj) <- "Cell.type.annotation"
+gene_R2_subset <- gene_R2[1:50,]
+quantile(gene_R2_subset[,"Lineage"]/(gene_R2_subset[,"Lineage"] + gene_R2_subset[,"Celltype"]))
 
-# (optional but common) use the normalized/log data
-Seurat::DefaultAssay(seurat_obj) <- "RNA"
-
-# Helper: run FindMarkers and return top N genes (by avg_log2FC, with p adj tie-break)
-top_markers_one_vs_rest <- function(obj, ident, n = 50,
-                                    min.pct = 0.1, logfc.threshold = 0.25,
-                                    test.use = "wilcox", only.pos = TRUE) {
-  res <- Seurat::FindMarkers(
-    object = obj,
-    ident.1 = ident,
-    ident.2 = NULL,          # one vs all other identities
-    only.pos = only.pos,
-    test.use = test.use,
-    min.pct = min.pct,
-    logfc.threshold = logfc.threshold
-  )
-  
-  # avg_log2FC is Seurat v4/v5; older versions use avg_logFC
-  fc_col <- if ("avg_log2FC" %in% colnames(res)) "avg_log2FC" else "avg_logFC"
-  
-  res$gene <- rownames(res)
-  res <- res[order(-res[[fc_col]], res$p_val_adj, res$p_val), , drop = FALSE]
-  
-  head(res$gene, n)
-}
-
-celltypes <- c("Monocyte", "Neutrophil", "Undifferentiated")
-
-top50_list <- setNames(
-  lapply(celltypes, function(ct) top_markers_one_vs_rest(seurat_obj, ct, n = 50)),
-  celltypes
-)
-
-# union of all selected markers
-marker_genes_union <- sort(unique(unlist(top50_list)))
-
-gene_R2[marker_genes_union,]
-summary(gene_R2[marker_genes_union,])
