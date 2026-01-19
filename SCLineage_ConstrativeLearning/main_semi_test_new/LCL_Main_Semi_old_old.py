@@ -59,19 +59,10 @@ def reproducibility(seed, use_cuda):
     if use_cuda:
         torch.cuda.manual_seed(seed)
 
-# def load_checkpoint(model, checkpoint_path):
-#     checkpoint = torch.load(checkpoint_path)
-#     model.load_state_dict(checkpoint['state_dict'], strict=False)
-#     print(f'Checkpoint {checkpoint_path} was loaded')
-#     return model
-
 def load_checkpoint(model, checkpoint_path):
-    # load to CPU if no GPU is available; otherwise load to GPU
-    map_loc = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=map_loc)
-
+    checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
-    print(f'Checkpoint {checkpoint_path} was loaded to {map_loc}')
+    print(f'Checkpoint {checkpoint_path} was loaded')
     return model
 
 def define_param_groups(model, weight_decay):
@@ -129,9 +120,9 @@ class scContraLearn(pl.LightningModule):
         loss = self.loss_fn(z1, z2, z_unl)
 
         # logging
-        self.log('train_loss',     loss,  on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train_contrast', self.loss_fn.last_contrastive, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-        self.log('train_penalty', self.loss_fn.last_penalty, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log('train_loss',     loss,                       on_step=True, on_epoch=True, prog_bar=True)
+        self.log('contrast_loss',  self.loss_fn.last_contrastive, on_epoch=True)
+        self.log('entropy_penalty', self.loss_fn.last_penalty,     on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -172,28 +163,10 @@ class LossCallback(Callback):
         self.val_losses = []
         self.avg_val_losses = []
 
-        # NEW: store parts
-        self.train_contrast = []
-        self.train_penalty  = []
-        self.val_contrast   = []
-
-
     def on_train_epoch_end(self, trainer, pl_module, unused=None):
-        print("DEBUG keys:", list(trainer.callback_metrics.keys()))
-
-        cm = trainer.callback_metrics
-        
-        if 'train_loss' in cm:
-            self.train_losses.append(cm['train_loss'].item())
-            
-        if 'train_contrast' in cm:
-            self.train_contrast.append(cm['train_contrast'].item())
-        
-        if 'train_penalty' in cm:
-            self.train_penalty.append(cm['train_penalty'].item())
-
-
-
+        train_loss = trainer.callback_metrics.get('train_loss')
+        if train_loss is not None:
+            self.train_losses.append(train_loss.item())
 
     def on_validation_epoch_end(self, trainer, pl_module):
         val_loss = trainer.callback_metrics.get('val_loss')
@@ -307,7 +280,6 @@ def save_model_and_losses(trainer, loss_callback, config):
     # Save training losses
     np.save(os.path.join(config.out_dir, f'train_losses_bs{config.batch_size}_tau{config.temperature}.npy'),
             np.array(loss_callback.train_losses))
-    
 
     if config.train_test:
         # Save validation losses if train_test is True
@@ -315,11 +287,6 @@ def save_model_and_losses(trainer, loss_callback, config):
                 np.array(loss_callback.val_losses))
         np.save(os.path.join(config.out_dir, f'avg_val_losses_bs{config.batch_size}_tau{config.temperature}.npy'),
                 np.array(loss_callback.avg_val_losses))
-
-    np.save(os.path.join(config.out_dir, f'train_contrast_bs{config.batch_size}_tau{config.temperature}.npy'),
-            np.array(loss_callback.train_contrast))
-    np.save(os.path.join(config.out_dir, f'train_penalty_bs{config.batch_size}_tau{config.temperature}.npy'),
-            np.array(loss_callback.train_penalty))
 
 def main():
     args = get_args()

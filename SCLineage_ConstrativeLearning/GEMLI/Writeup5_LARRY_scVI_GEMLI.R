@@ -2,25 +2,18 @@ rm(list=ls())
 
 library(Seurat)
 library(GEMLI)
-library(HiClimR) # or else GEMLI cannot find fastCor
 
-out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup5/"
-load(paste0(out_folder, "Larry_41093_2000_norm_log_cleaned.RData"))
+out_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI"
+seurat_obj <- readRDS(file.path(out_folder, "cellTagMulti_scVI_seurat.rds"))
 
 date_of_run <- Sys.time()
 session_info <- devtools::session_info()
 
-code_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/kevin/Writeup5_GEMLI/"
+code_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI/"
+
 source(paste0(code_folder, "predict_lineages_custom.R"))
 source(paste0(code_folder, "quantify_clusters_iterative_custom.R"))
 source(paste0(code_folder, "test_lineages_custom.R"))
-
-# run GEMLI
-data_matrix <- read.csv(paste0(out_folder, "Larry_scvi_full_embeddings.csv"))
-data_matrix <- as.matrix(data_matrix)
-rownames(data_matrix) <- Seurat::Cells(seurat_obj)
-colnames(data_matrix) <- paste0("scVI_", 1:ncol(data_matrix))
-seurat_obj[["scVI"]] <- Seurat::CreateDimReducObject(data_matrix)
 
 # first filter to the top 50 lineages
 lineage_tab <- table(seurat_obj$clone_id)
@@ -41,11 +34,14 @@ set.seed(10)
 GEMLI_items <- predict_lineages_custom(GEMLI_items,
                                        bool_find_markers = FALSE,
                                        desired_cluster_size = c(50,200),
-                                       verbose = 4)
+                                       verbose = 1)
 
 save(date_of_run, session_info,
      GEMLI_items,
-     file = paste0(out_folder, "Writeup5_Larry_scVI_GEMLI.RData"))
+     file = paste0(out_folder, "cellTagMulti_scVI_GEMLI.RData"))
+
+zz <- GEMLI_items[['prediction']] # we need to look at how they did it on LARRY...
+quantile(zz[zz!=0])
 
 GEMLI_items <- test_lineages_custom(GEMLI_items, 
                                     valid_fam_sizes = c(50,200))
@@ -53,11 +49,13 @@ GEMLI_items$testing_results
 
 save(date_of_run, session_info,
      GEMLI_items,
-     file = paste0(out_folder, "Writeup5_Larry_scVI_GEMLI.RData"))
+     file = paste0(out_folder, "cellTagMulti_scVI_GEMLI.RData"))
+
+print("Done! :)")
 
 ###############
 
-plot_folder <- "~/kzlinlab/projects/scContrastiveLearn/git/SCSeq_LineageBarcoding_kevin/fig/kevin/Writeup5/"
+plot_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI/"
 
 total_true <- GEMLI_items$testing_results["0","TP"]
 total_false <- GEMLI_items$testing_results["0","FP"]

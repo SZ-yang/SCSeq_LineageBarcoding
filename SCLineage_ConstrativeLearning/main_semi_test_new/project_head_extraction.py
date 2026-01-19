@@ -115,6 +115,14 @@ class scContraLearn(pl.LightningModule):
 def load_weights(lightning_module: pl.LightningModule, ckpt_path: str):
     ckpt = torch.load(ckpt_path, map_location='cpu')
     lightning_module.load_state_dict(ckpt['state_dict'], strict=False)
+    missing, unexpected = lightning_module.load_state_dict(ckpt['state_dict'], strict=False)
+
+    print("=== STATE_DICT LOAD REPORT ===")
+    print("missing:", len(missing))
+    print("unexpected:", len(unexpected))
+    print("missing examples:", missing[:10])
+    print("unexpected examples:", unexpected[:10])
+    print("================================")
     print(f"[OK] Loaded checkpoint: {ckpt_path}")
 
 

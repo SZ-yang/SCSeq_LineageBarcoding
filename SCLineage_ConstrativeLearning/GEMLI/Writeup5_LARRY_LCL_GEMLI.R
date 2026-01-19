@@ -3,13 +3,13 @@ rm(list=ls())
 library(Seurat)
 library(GEMLI)
 
-out_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI_AUPRC"
+out_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI"
 seurat_obj <- readRDS(file.path(out_folder, "cellTagMulti_LCL_seurat.rds"))
 
 date_of_run <- Sys.time()
 session_info <- devtools::session_info()
 
-code_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI_AUPRC/"
+code_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI/"
 
 source(paste0(code_folder, "predict_lineages_custom.R"))
 source(paste0(code_folder, "quantify_clusters_iterative_custom.R"))
@@ -54,7 +54,7 @@ save(date_of_run, session_info,
 print("Done! :)")
 
 ###############
-plot_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI_AUPRC/"
+plot_folder <- "/Users/apple/Desktop/KB/SCSeq_LineageBarcoding/SCLineage_ConstrativeLearning/GEMLI/"
 
 total_true <- GEMLI_items$testing_results["0","TP"]
 total_false <- GEMLI_items$testing_results["0","FP"]
