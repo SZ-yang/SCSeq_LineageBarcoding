@@ -137,7 +137,7 @@ def main():
     # User-set knobs (edit these)
     # -------------------------
     min_cells_per_clone = 10
-    max_clones = 30
+    max_clones = 50
     cells_per_clone = 200
     baseline_mode = "zero"   # "zero" or "mean"
     n_steps = 100
