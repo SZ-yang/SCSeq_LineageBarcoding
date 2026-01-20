@@ -13,11 +13,11 @@ keep_vec <- !is.na(seurat_obj$assigned_lineage)
 seurat_obj$keep <- keep_vec
 seurat_obj <- subset(seurat_obj, keep == TRUE)
 
-tab_vec <- table(seurat_obj$assigned_lineage)
-lineage_names <- names(tab_vec)[which(tab_vec >= 50)]
-keep_vec <- seurat_obj$assigned_lineage %in% lineage_names
-seurat_obj$keep <- keep_vec
-seurat_obj <- subset(seurat_obj, keep == TRUE)
+# tab_vec <- table(seurat_obj$assigned_lineage)
+# lineage_names <- names(tab_vec)[which(tab_vec >= 50)]
+# keep_vec <- seurat_obj$assigned_lineage %in% lineage_names
+# seurat_obj$keep <- keep_vec
+# seurat_obj <- subset(seurat_obj, keep == TRUE)
 
 keep_vec <- seurat_obj$Cell.type.annotation %in% c("Undifferentiated", "Neutrophil", "Monocyte")
 seurat_obj$keep <- keep_vec
@@ -33,7 +33,7 @@ md <- seurat_obj@meta.data
 combo_key <- paste(md$assigned_lineage, md$Cell.type.annotation, sep = "||")
 combo_tab <- table(combo_key)
 
-keep_step1 <- combo_tab[combo_key] >= 5
+keep_step1 <- combo_tab[combo_key] >= 3
 cells_step1 <- rownames(md)[keep_step1]
 seurat_obj <- subset(seurat_obj, cells = cells_step1)
 
@@ -51,7 +51,6 @@ n_types_per_lineage <- tapply(
 
 keep_lineages <- names(n_types_per_lineage)[n_types_per_lineage > 2]
 cells_step2 <- rownames(md1)[md1$assigned_lineage %in% keep_lineages]
-
 seurat_obj <- subset(seurat_obj, cells = cells_step2)
 
 # look at the final meta.data
@@ -160,7 +159,7 @@ gene_R2 <- gene_R2[is.finite(gene_R2[, "Lineage"]) & is.finite(gene_R2[, "Cellty
 
 gene_R2 <- gene_R2[order(gene_R2[,"SST"], decreasing = TRUE),]
 
-gene_R2_subset <- gene_R2[1:50,]
+gene_R2_subset <- gene_R2[1:25,]
 head(gene_R2_subset)
 quantile(gene_R2_subset[,"Lineage"]/(gene_R2_subset[,"Lineage"] + gene_R2_subset[,"Celltype"]))
 
