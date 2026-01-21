@@ -29,21 +29,53 @@ keep_vec[seurat_obj$assigned_lineage %in% lineage_names] <- TRUE
 seurat_obj$keep <- keep_vec
 seurat_obj <- subset(seurat_obj, keep == TRUE)
 
+#################################
+
+# create a timepoint (integer) column
+time_vec <- seurat_obj$sample
+time_vec <- as.numeric(gsub("B4D", "", time_vec))
+seurat_obj$time_info <- time_vec
+
+# create a X_clone matrix
+lin <- seurat_obj$assigned_lineage
+cells <- colnames(seurat_obj)
+
+lin <- lin[cells]  # align
+
+lineages <- unique(lin)
+j <- match(lin, lineages)
+
+library(Matrix)
+X_clone <- sparseMatrix(
+  i = seq_along(cells),
+  j = j,
+  x = 1L,
+  dims = c(length(cells), length(lineages)),
+  dimnames = list(cells, lineages)
+)
+colnames(X_clone) <- paste0("NewLineage_", 1:ncol(X_clone))
+X_clone <- as.matrix(X_clone)
+
+seurat_obj[["clone"]] <- Seurat::CreateDimReducObject(X_clone)
+seurat_obj$assigned_lineage <- NULL
+
+###############################
+
 seurat_obj
 # An object of class Seurat 
 # 31761 features across 22238 samples within 1 assay 
 # Active assay: RNA (31761 features, 2000 variable features)
 # 3 layers present: counts, data, scale.data
-# 2 dimensional reductions calculated: pca, umap
+# 3 dimensional reductions calculated: pca, umap, X_clone
 
 # assigned_lineage: lineage information
 # sample: timepoint 
 # predicted.id_cca_co: cell-type
 # md_fate_coarse_rev1: the fates
 
-table(seurat_obj$sample)
-# B4D12 B4D21  B4D3 
-# 3258  8090 10890 
+table(seurat_obj$time_point)
+# 3    12    21 
+# 10890  3258  8090 
 
 table(seurat_obj$predicted.id_cca_co)
 # Dead-end_0 Dead-end_1 Dead-end_2    Early_0    Early_1    Early_2      Fib_0 
@@ -57,10 +89,16 @@ table(seurat_obj$md_fate_coarse_rev1)
 # dead-end            na reprogramming 
 # 4828         13614          3796
 
+table(seurat_obj$md_fate_rev1)
+# Day12 dead-end Day12 reprogramming      Day21 dead-end Day21 reprogramming 
+# 728                 825                3700                2157 
+# Day3 dead-end  Day3 reprogramming                  na 
+# 400                 814               13614 
+
 SeuratDisk::SaveH5Seurat(seurat_obj,
-                         filename = "~/kzlinlab/data/celltagging-multi_fibroblast/celltagging-multi_fibroblast.h5Seurat",
+                         filename = "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup11/celltagging-multi_fibroblast.h5Seurat",
                          overwrite = TRUE)
-SeuratDisk::Convert("~/kzlinlab/data/celltagging-multi_fibroblast/celltagging-multi_fibroblast.h5Seurat",
+SeuratDisk::Convert("~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup11/celltagging-multi_fibroblast.h5Seurat",
                     dest = "h5ad",
                     misc = FALSE,
                     overwrite = TRUE)
