@@ -5,8 +5,10 @@ library(Matrix)
 library(variancePartition)
 library(lme4)
 
-load("~/kzlinlab/data/larry_hematopoiesis/larry-dataset_KZL.RData")
+load("~/kzlinlab/data/celltagging-multi_fibroblast/celltagging-multi_fibroblast.RData")
 out_folder <- "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup10c/"
+
+head(seurat_obj@meta.data)
 
 keep_vec <- !is.na(seurat_obj$assigned_lineage)
 seurat_obj$keep <- keep_vec
@@ -21,26 +23,24 @@ seurat_obj <- subset(seurat_obj, keep == TRUE)
 #############################
 
 seurat_obj <- Seurat::DietSeurat(seurat_obj, 
-                                 layers = "counts",
-                                 features = Seurat::VariableFeatures(seurat_obj))
+                                 layers = "counts")
 seurat_obj <- Seurat::NormalizeData(seurat_obj)
 seurat_obj <- Seurat::ScaleData(seurat_obj)
 scaled_data <- SeuratObject::LayerData(seurat_obj,
                                        assay = "RNA",
                                        layer = "scale.data")
-seurat_obj$Time.point <- factor(paste0("T", seurat_obj$Time.point))
 var_info <- seurat_obj@meta.data
 
 # fit
 var_data <- scaled_data
-form <- ~ (1 | Cell.type.annotation) + (1 | assigned_lineage)  + (1 | Time.point)
+form <- ~ (1 | predicted.id_cca_co) + (1 | assigned_lineage)  + (1 | sample)
 varPart <- variancePartition::fitExtractVarPartModel(var_data, 
                                                      form, 
                                                      var_info, 
                                                      showWarnings = FALSE)
 
 save(varPart,
-     file = "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup10c/Writeup10c_larry_variancePartition.RData")
+     file = "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup10c/Writeup10c_celltagmulti_variancePartition.RData")
 
 # variance_explained <- Matrix::rowSums(varPart[,c("assigned_lineage", "Cell.type.annotation", "Time.point")])
 # varPart <- varPart[order(variance_explained, decreasing = TRUE),]
