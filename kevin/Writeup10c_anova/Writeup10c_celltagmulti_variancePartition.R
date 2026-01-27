@@ -15,10 +15,19 @@ seurat_obj$keep <- keep_vec
 seurat_obj <- subset(seurat_obj, keep == TRUE)
 
 tab_vec <- table(seurat_obj$assigned_lineage)
-lineage_names <- names(tab_vec)[which(tab_vec >= 50)]
+lineage_names <- names(tab_vec)[which(tab_vec >= 5)]
 keep_vec <- seurat_obj$assigned_lineage %in% lineage_names
 seurat_obj$keep <- keep_vec
 seurat_obj <- subset(seurat_obj, keep == TRUE)
+
+#############################
+
+tmp <- as.character(seurat_obj$predicted.id_cca_co)
+tmp2 <- sapply(tmp, function(x){
+  strsplit(x, split = "_")[[1]][1]
+})
+names(tmp2) <- NULL
+seurat_obj$celltype <- tmp2
 
 #############################
 
@@ -33,7 +42,7 @@ var_info <- seurat_obj@meta.data
 
 # fit
 var_data <- scaled_data
-form <- ~ (1 | predicted.id_cca_co) + (1 | assigned_lineage)  + (1 | sample)
+form <- ~ (1 | celltype) + (1 | assigned_lineage)  + (1 | sample)
 varPart <- variancePartition::fitExtractVarPartModel(var_data, 
                                                      form, 
                                                      var_info, 
@@ -42,7 +51,7 @@ varPart <- variancePartition::fitExtractVarPartModel(var_data,
 save(varPart,
      file = "~/kzlinlab/projects/scContrastiveLearn/out/kevin/Writeup10c/Writeup10c_celltagmulti_variancePartition.RData")
 
-# variance_explained <- Matrix::rowSums(varPart[,c("assigned_lineage", "Cell.type.annotation", "Time.point")])
+# variance_explained <- Matrix::rowSums(varPart[,c("assigned_lineage", "celltype", "sample")])
 # varPart <- varPart[order(variance_explained, decreasing = TRUE),]
 # variance_explained <- variance_explained[order(variance_explained, decreasing = TRUE),]
 # 
