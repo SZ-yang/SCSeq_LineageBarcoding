@@ -35,7 +35,6 @@ seurat_obj <- Seurat::RunUMAP(seurat_obj,
                               dims = 1:ncol(embedding),
                               reduction.name = "LCLUMAP")
 
-
 umap_mat <- seurat_obj[["LCLUMAP"]]@cell.embeddings
 
 # assigned colors
