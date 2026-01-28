@@ -36,13 +36,40 @@ seurat_obj$clone_id <- factor(paste0("Lineage:", seurat_obj$clone_id))
 seurat_obj <- Seurat::FindNeighbors(seurat_obj, 
                                     dims = 1:32, 
                                     reduction = "LCL")
-seurat_obj <- Seurat::FindClusters(seurat_obj, resolution = 1)
+seurat_obj <- Seurat::FindClusters(seurat_obj, 
+                                   resolution = 0.1,
+                                   group.singletons = FALSE)
 
-###########
+DimPlot(seurat_obj,
+        reduction = "LCLUMAP",
+        group.by = "seurat_clusters")
 
-md <- seurat_obj@meta.data
-ari <- mclust::adjustedRandIndex(md$clone_id, md$seurat_clusters)
-ari
+DimPlot(seurat_obj,
+        reduction = "LCLUMAP",
+        group.by = "cell_type")
+
+
+tab_mat <- table(seurat_obj$clone_id,
+                 seurat_obj$cell_type)
+lineage_assignment <- sapply(1:nrow(tab_mat), function(i){
+  if(tab_mat[i,"Fibroblast"] >= 2*(tab_mat[i,"iEP"]+1)){
+    "commit_fibroblast"
+  } else if(tab_mat[i,"iEP"] >= 2*(tab_mat[i,"Fibroblast"]+1)){
+    "commit_iep"
+  } else {
+    "na"
+  }
+})
+names(lineage_assignment) <- rownames(tab_mat)
+vec <- lineage_assignment[seurat_obj$clone_id]
+names(vec) <- Seurat::Cells(seurat_obj)
+seurat_obj$fate <- vec
+
+
+DimPlot(seurat_obj,
+        reduction = "LCLUMAP",
+        group.by = "fate")
+
 
 ################
 
@@ -108,14 +135,8 @@ per_clone <- data.frame(
     pair_agreement(clust_all[ii], mmax = 500)
   }, numeric(1))
 )
-plot(per_clone$n_cells, per_clone$same_cluster_rate)
+plot(per_clone$n_cells, per_clone$same_cluster_rate,
+     main = paste0("LCL: ", length(unique(md$seurat_clusters))))
 
-# drop clones with <2 cells (NA rate)
-per_clone_use <- subset(per_clone, n_cells >= 2)
-
-overall_mean <- mean(per_clone_use$same_cluster_rate, na.rm = TRUE)
-
+overall_mean <- mean(per_clone$same_cluster_rate, na.rm = TRUE)
 overall_mean
-# per_clone_use has the per-clone rates if you want to inspect / plot
-
-
