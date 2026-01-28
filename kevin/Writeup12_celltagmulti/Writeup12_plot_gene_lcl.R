@@ -53,7 +53,15 @@ DimPlot(seurat_obj,
         group.by = "seurat_clusters",
         label = TRUE)
 
+DimPlot(seurat_obj,
+        reduction = "LCLUMAP",
+        group.by = "cell_type",
+        label = TRUE)
+
 de_res <- Seurat::FindAllMarkers(seurat_obj, group.by = "seurat_clusters")
+save(de_res, 
+     file = "/Users/kevinlin/Library/CloudStorage/Dropbox/Collaboration-and-People/Joshua/out/kevin/Writeup12_joshua-celltagmulti/Writeup12_FindAllMarkers.csv")
+
 de_res2 <- de_res
 de_res2 <- de_res2[which(de_res2$avg_log2FC >= 3),]
 de_res2 <- de_res2[which(de_res2$pct.1 >= 0.3),]
@@ -65,7 +73,17 @@ gene_vec <- c("Ttr", "Acox2", "Bhlha15", "Shh", "Sfrp1", "Ptn", "Dcn", "Cyp2f2")
 for(gene in gene_vec){
   print(scCustomize::FeaturePlot_scCustom(seurat_obj,
                                     features = gene,
-                                    reduction = "LCLUMAP"))
+                                    reduction = "LCLUMAP",
+                                    min.cutoff = "q01",
+                                    max.cutoff = "q99"))
 }
+ig_df[gene_vec,]
+
+scCustomize::FeaturePlot_scCustom(seurat_obj,
+                                  features = "Shh",
+                                  reduction = "LCLUMAP",
+                                  max.cutoff = "q99")
 
 # Dcn,Ptn,Sfrp1, maybe Shh
+
+tmp <- de_res2[c("Dcn","Ptn","Sfrp1","Shh"),c("p_val_adj", "avg_log2FC", "cluster")]
